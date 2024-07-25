@@ -1,4 +1,6 @@
+#include <cctype>
 #include <cstring>
+#include <iomanip>
 #include <iostream>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -76,6 +78,35 @@ int main() {
 		buffer[bytesRead] = '\0';
 		std::cout << "Received " << bytesRead << " bytes: " << buffer << std::endl;
 
+		int byte_count = 0;
+		for (int i = 11; i < bytesRead; i++) {
+			std::cout << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(buffer[i]);
+
+			std::cout << " ";
+
+			byte_count++;
+			if (byte_count % 16 == 0) {
+				std::cout << std::endl;
+			}
+		}
+
+		std::printf("\n");
+
+		byte_count = 0;
+		for (int i = 11; i < bytesRead; i++) {
+			if (std::isprint(buffer[i])) {
+				printf("%2c ", buffer[i]);
+			} else {
+				printf("%2c ", '.');
+			}
+			byte_count++;
+			if (byte_count % 16 == 0) {
+				std::printf("\n");
+			}
+		}
+
+		std::printf("\n");
+
 		memcpy(&h, buffer, 12);
 
 		h.id = 1234;
@@ -94,7 +125,7 @@ int main() {
 
 		// Create an empty response
 		char response[512];
-		memcpy(response, &buffer, 512);
+		memcpy(response, &buffer, bytesRead);
 		memcpy(response, &h, 12);
 
 		// Send response
