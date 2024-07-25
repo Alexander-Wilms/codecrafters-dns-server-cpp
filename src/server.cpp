@@ -124,7 +124,7 @@ int main() {
 		// Create an empty response
 		char response[512];
 		memcpy(response, &buffer, bytesRead);
-		// memcpy(response, &h, 12);
+		response[2] = response[2] | (char)1;
 
 		// Send response
 		if (sendto(udpSocket, response, sizeof(response), 0, reinterpret_cast<struct sockaddr *>(&clientAddress), sizeof(clientAddress)) == -1) {
