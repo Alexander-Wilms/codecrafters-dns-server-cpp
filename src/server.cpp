@@ -78,22 +78,23 @@ int main() {
 
 		memcpy(&h, buffer, 12);
 
-        h.id = 1234;
-        h.qr = 1;
-        h.opcode = 0;
-        h.aa = 0;
-        h.tc = 0;
-        h.rd = 0;
-        h.ra = 0;
-        h.z = 0;
-        h.rcode = 0;
-        h.qdcount = 0;
-        h.ancount = 0;
-        h.nscount = 0;
-        h.arcount = 0;
+		h.id = 1234;
+		h.qr = 1;
+		h.opcode = 0;
+		h.aa = 0;
+		h.tc = 0;
+		h.rd = 0;
+		h.ra = 0;
+		h.z = 0;
+		h.rcode = 0;
+		h.qdcount = 0;
+		h.ancount = 0;
+		h.nscount = 0;
+		h.arcount = 0;
 
 		// Create an empty response
-		char response[12];
+		char response[512];
+		memcpy(response, &buffer, 512);
 		memcpy(response, &h, 12);
 
 		// Send response
