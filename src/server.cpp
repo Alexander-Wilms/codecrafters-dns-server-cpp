@@ -50,13 +50,12 @@ int main() {
 		return 1;
 	}
 
-	sockaddr_in serv_addr = {
-		.sin_family = AF_INET,
-		.sin_port = htons(2053),
-		.sin_addr = {htonl(INADDR_ANY)},
-	};
-
-	if (bind(udpSocket, reinterpret_cast<struct sockaddr *>(&serv_addr), sizeof(serv_addr)) != 0) {
+	if (sockaddr_in serv_addr = {
+			.sin_family = AF_INET,
+			.sin_port = htons(2053),
+			.sin_addr = {htonl(INADDR_ANY)},
+		};
+		bind(udpSocket, reinterpret_cast<struct sockaddr *>(&serv_addr), sizeof(serv_addr)) != 0) {
 		std::cerr << "Bind failed: " << strerror(errno) << std::endl;
 		return 1;
 	}
@@ -125,7 +124,7 @@ int main() {
 		// Create an empty response
 		char response[512];
 		memcpy(response, &buffer, bytesRead);
-		//memcpy(response, &h, 12);
+		// memcpy(response, &h, 12);
 
 		// Send response
 		if (sendto(udpSocket, response, sizeof(response), 0, reinterpret_cast<struct sockaddr *>(&clientAddress), sizeof(clientAddress)) == -1) {
