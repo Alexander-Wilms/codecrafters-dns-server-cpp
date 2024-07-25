@@ -45,8 +45,7 @@ int main() {
 
 	// Since the tester restarts your program quite often, setting REUSE_PORT
 	// ensures that we don't run into 'Address already in use' errors
-	int reuse = 1;
-	if (setsockopt(udpSocket, SOL_SOCKET, SO_REUSEPORT, &reuse, sizeof(reuse)) < 0) {
+	if (int reuse = 1; setsockopt(udpSocket, SOL_SOCKET, SO_REUSEPORT, &reuse, sizeof(reuse)) < 0) {
 		std::cerr << "SO_REUSEPORT failed: " << strerror(errno) << std::endl;
 		return 1;
 	}
