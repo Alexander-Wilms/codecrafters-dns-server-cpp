@@ -64,7 +64,7 @@ int main() {
 	char buffer[512];
 	socklen_t clientAddrLen = sizeof(clientAddress);
 
-	header_struct header = {};
+	header_struct h = {};
 	while (true) {
 		// Receive data
 		bytesRead = recvfrom(udpSocket, buffer, sizeof(buffer), 0, reinterpret_cast<struct sockaddr *>(&clientAddress), &clientAddrLen);
@@ -76,10 +76,25 @@ int main() {
 		buffer[bytesRead] = '\0';
 		std::cout << "Received " << bytesRead << " bytes: " << buffer << std::endl;
 
-		memcpy(&header, buffer, 12);
+		memcpy(&h, buffer, 12);
+
+        h.id = 1234;
+        h.qr = 1;
+        h.opcode = 0;
+        h.aa = 0;
+        h.tc = 0;
+        h.rd = 0;
+        h.ra = 0;
+        h.z = 0;
+        h.rcode = 0;
+        h.qdcount = 0;
+        h.ancount = 0;
+        h.nscount = 0;
+        h.arcount = 0;
+
 		// Create an empty response
 		char response[12];
-		memcpy(response, &header, 12);
+		memcpy(response, &h, 12);
 
 		// Send response
 		if (sendto(udpSocket, response, sizeof(response), 0, reinterpret_cast<struct sockaddr *>(&clientAddress), sizeof(clientAddress)) == -1) {
