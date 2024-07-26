@@ -1,6 +1,7 @@
 #include <cctype>
+#include <cstdint>
 #include <cstring>
-#include <iomanip>
+#include <ios>
 #include <iostream>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -8,7 +9,7 @@
 
 // https://en.cppreference.com/w/cpp/language/bit_field
 struct header_struct {
-	unsigned int id : 16;
+	uint16_t id : 16;
 	unsigned int qr : 1;
 	unsigned int opcode : 4;
 	unsigned int aa : 1;
@@ -22,6 +23,22 @@ struct header_struct {
 	unsigned int nscount : 16;
 	unsigned int arcount : 16;
 };
+
+bool system_is_little_endian() {
+	short int number = 0x0102;
+	char *ptr = reinterpret_cast<char *>(&number);
+	bool little_endian = *ptr == 0x02; // If the least significant byte is 0x02, it's little-endian
+	std::cout << "Little endian: " << little_endian << std::endl;
+	return little_endian;
+}
+
+uint16_t little_endian_to_big_endian(uint16_t value) {
+	return (value >> 8) | (value << 8);
+}
+
+uint16_t big_endian_to_little_endian(uint16_t value) {
+	return (value << 8) | (value >> 8);
+}
 
 int main() {
 	// Flush after every std::cout / std::cerr
@@ -50,37 +67,66 @@ int main() {
 		return 1;
 	}
 
-	if (sockaddr_in serv_addr = {
-			.sin_family = AF_INET,
-			.sin_port = htons(2053),
-			.sin_addr = {htonl(INADDR_ANY)},
-		};
+	sockaddr_in serv_addr = {
+		.sin_family = AF_INET,
+		.sin_port = htons(2053),
+		.sin_addr = {htonl(INADDR_ANY)},
+	};
+	if (
 		bind(udpSocket, reinterpret_cast<struct sockaddr *>(&serv_addr), sizeof(serv_addr)) != 0) {
 		std::cerr << "Bind failed: " << strerror(errno) << std::endl;
 		return 1;
 	}
 
+	std::cout << "Bound port: " << ntohs(serv_addr.sin_port) << std::endl;
+
 	int bytesRead;
-	char buffer[512];
+	char request[512];
+	char response[512];
 	socklen_t clientAddrLen = sizeof(clientAddress);
 
 	header_struct h = {};
 	while (true) {
+		std::printf("↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓\n");
+
 		// Receive data
-		bytesRead = recvfrom(udpSocket, buffer, sizeof(buffer), 0, reinterpret_cast<struct sockaddr *>(&clientAddress), &clientAddrLen);
+		bytesRead = recvfrom(udpSocket, request, sizeof(request), 0, reinterpret_cast<struct sockaddr *>(&clientAddress), &clientAddrLen);
 		if (bytesRead == -1) {
 			perror("Error receiving data");
 			break;
 		}
 
-		buffer[bytesRead] = '\0';
-		std::cout << "Received " << bytesRead << " bytes: " << buffer << std::endl;
+		uint16_t source_port = ntohs(reinterpret_cast<struct sockaddr_in *>(&clientAddress)->sin_port);
 
+		uint16_t destination_port = htons(2053);
+
+		std::cout << "Source port: " << source_port << std::endl;
+		std::cout << "Destination port: " << destination_port << std::endl;
+
+		request[bytesRead] = '\0';
+		std::cout << "Received UDP packet with " << bytesRead << " bytes" << std::endl;
+
+		std::printf("message (hex):\n↓\n");
+		for (int i = 0; i < bytesRead; i++) {
+			std::printf("%02x ", static_cast<unsigned char>(request[i]));
+		}
+		std::printf("\n↑\n");
+
+		std::printf("message (ASCII):\n↓\n");
+		for (int i = 0; i < bytesRead; i++) {
+			if (isprint(request[i])) {
+				std::printf("%c", request[i]);
+			} else {
+				std::cout << ".";
+			}
+		}
+		std::printf("\n↑\n");
+
+		std::printf("message (hex, formatted):\n↓\n");
 		int byte_count = 0;
-		for (int i = 11; i < bytesRead; i++) {
-			std::cout << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(buffer[i]);
 
-			std::cout << " ";
+		for (int i = 0; i < bytesRead; i++) {
+			std::printf("%02x ", static_cast<unsigned char>(request[i]));
 
 			byte_count++;
 			if (byte_count % 16 == 0) {
@@ -88,12 +134,14 @@ int main() {
 			}
 		}
 
-		std::printf("\n");
+		std::printf("\n↑\n");
+
+		std::printf("message (ASCII, formatted):\n↓\n");
 
 		byte_count = 0;
-		for (int i = 11; i < bytesRead; i++) {
-			if (std::isprint(buffer[i])) {
-				printf("%2c ", buffer[i]);
+		for (int i = 0; i < bytesRead; i++) {
+			if (std::isprint(request[i])) {
+				printf("%2c ", request[i]);
 			} else {
 				printf("%2c ", '.');
 			}
@@ -103,11 +151,10 @@ int main() {
 			}
 		}
 
-		std::printf("\n");
+		std::printf("\n↑\n");
 
-		memcpy(&h, buffer, 12);
+		memcpy(&h, request, 2);
 
-		h.id = 1234;
 		h.qr = 1;
 		h.opcode = 0;
 		h.aa = 0;
@@ -121,15 +168,29 @@ int main() {
 		h.nscount = 0;
 		h.arcount = 0;
 
-		// Create an empty response
-		char response[512];
-		memcpy(response, &buffer, bytesRead);
-		response[2] = response[2] | (char)1;
+		// Copy request to create response
+		memcpy(&response, &request, 512);
+		// Override header
+		memcpy(&response, &h, 12);
+
+		// found the solution using Wireshark
+		if (system_is_little_endian()) {
+			h.id = big_endian_to_little_endian(h.id);
+		} else {
+			h.id = h.id;
+		}
+		std::cout << "id: " << h.id << std::endl;
+		std::cout << "id (hex): 0x" << std::hex << h.id << std::dec << std::endl;
+
+		std::cout << "qr: " << h.qr << std::endl;
+		std::cout << "opcode: " << h.opcode << std::endl;
 
 		// Send response
-		if (sendto(udpSocket, response, sizeof(response), 0, reinterpret_cast<struct sockaddr *>(&clientAddress), sizeof(clientAddress)) == -1) {
+		if (sendto(udpSocket, request, sizeof(response), 0, reinterpret_cast<struct sockaddr *>(&clientAddress), sizeof(clientAddress)) == -1) {
 			perror("Failed to send response");
 		}
+
+		std::printf("↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑\n");
 	}
 
 	close(udpSocket);

@@ -35,3 +35,23 @@ Note: This section is for stages 2 and beyond.
    `src/server.cpp`.
 1. Commit your changes and run `git push origin master` to submit your solution
    to CodeCrafters. Test output will be streamed to your terminal.
+
+# Notes
+
+* The DNS messages are built on top of UDP packets.
+
+* Sending just a UDP packet:
+   * `echo -n "hello" > /dev/udp/127.0.0.1/2053`
+   * [One has to use `127.0.0.1` instead of `localhost`](https://stackoverflow.com/questions/9696129/how-to-send-only-one-udp-packet-with-netcat#comment54050586_16568803)
+
+* Sending DNS request messages:
+   * `dig @127.0.0.1 -p 2053 +noedns codecrafters.io`
+      * Displays response header fields
+      * Results in 2 DNS packets
+      * Both have the same header
+
+      or
+   * `nslookup -port=2053 codecrafters.io 127.0.0.1`
+      * Results in 4 DNS packets
+      * The first and third packets are shown by the server
+      * 1 and 2 have the same header and 3 and 4 have the same header
