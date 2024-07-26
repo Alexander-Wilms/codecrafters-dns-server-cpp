@@ -186,7 +186,7 @@ int main() {
 		std::cout << "opcode: " << h.opcode << std::endl;
 
 		// Send response
-		if (sendto(udpSocket, request, sizeof(response), 0, reinterpret_cast<struct sockaddr *>(&clientAddress), sizeof(clientAddress)) == -1) {
+		if (sendto(udpSocket, response, sizeof(response), 0, reinterpret_cast<struct sockaddr *>(&clientAddress), sizeof(clientAddress)) == -1) {
 			perror("Failed to send response");
 		}
 
