@@ -28,7 +28,12 @@ bool system_is_little_endian() {
 	short int number = 0x0102;
 	char *ptr = reinterpret_cast<char *>(&number);
 	bool little_endian = *ptr == 0x02; // If the least significant byte is 0x02, it's little-endian
-	std::cout << "Little endian: " << little_endian << std::endl;
+	if (little_endian) {
+		std::cout << "System is little endian" << std::endl;
+	} else {
+		std::cout << "System is NOT little endian" << std::endl;
+	}
+
 	return little_endian;
 }
 
@@ -38,6 +43,55 @@ uint16_t little_endian_to_big_endian(uint16_t value) {
 
 uint16_t big_endian_to_little_endian(uint16_t value) {
 	return (value << 8) | (value >> 8);
+}
+
+void print_request(char *request, int bytesRead) {
+	std::printf("message (hex):\n↓\n");
+	for (int i = 0; i < bytesRead; i++) {
+		std::printf("%02x ", static_cast<unsigned char>(request[i]));
+	}
+	std::printf("\n↑\n");
+
+	std::printf("message (ASCII):\n↓\n");
+	for (int i = 0; i < bytesRead; i++) {
+		if (isprint(request[i])) {
+			std::printf("%c", request[i]);
+		} else {
+			std::cout << ".";
+		}
+	}
+	std::printf("\n↑\n");
+
+	std::printf("message (hex, formatted):\n↓\n");
+	int byte_count = 0;
+
+	for (int i = 0; i < bytesRead; i++) {
+		std::printf("%02x ", static_cast<unsigned char>(request[i]));
+
+		byte_count++;
+		if (byte_count % 16 == 0) {
+			std::cout << std::endl;
+		}
+	}
+
+	std::printf("\n↑\n");
+
+	std::printf("message (ASCII, formatted):\n↓\n");
+
+	byte_count = 0;
+	for (int i = 0; i < bytesRead; i++) {
+		if (std::isprint(request[i])) {
+			printf("%2c ", request[i]);
+		} else {
+			printf("%2c ", '.');
+		}
+		byte_count++;
+		if (byte_count % 16 == 0) {
+			std::printf("\n");
+		}
+	}
+
+	std::printf("\n↑\n");
 }
 
 int main() {
@@ -106,87 +160,28 @@ int main() {
 		request[bytesRead] = '\0';
 		std::cout << "Received UDP packet with " << bytesRead << " bytes" << std::endl;
 
-		std::printf("message (hex):\n↓\n");
-		for (int i = 0; i < bytesRead; i++) {
-			std::printf("%02x ", static_cast<unsigned char>(request[i]));
-		}
-		std::printf("\n↑\n");
-
-		std::printf("message (ASCII):\n↓\n");
-		for (int i = 0; i < bytesRead; i++) {
-			if (isprint(request[i])) {
-				std::printf("%c", request[i]);
-			} else {
-				std::cout << ".";
-			}
-		}
-		std::printf("\n↑\n");
-
-		std::printf("message (hex, formatted):\n↓\n");
-		int byte_count = 0;
-
-		for (int i = 0; i < bytesRead; i++) {
-			std::printf("%02x ", static_cast<unsigned char>(request[i]));
-
-			byte_count++;
-			if (byte_count % 16 == 0) {
-				std::cout << std::endl;
-			}
-		}
-
-		std::printf("\n↑\n");
-
-		std::printf("message (ASCII, formatted):\n↓\n");
-
-		byte_count = 0;
-		for (int i = 0; i < bytesRead; i++) {
-			if (std::isprint(request[i])) {
-				printf("%2c ", request[i]);
-			} else {
-				printf("%2c ", '.');
-			}
-			byte_count++;
-			if (byte_count % 16 == 0) {
-				std::printf("\n");
-			}
-		}
-
-		std::printf("\n↑\n");
-
-		memcpy(&h, request, 2);
-
-		h.qr = 1;
-		h.opcode = 0;
-		h.aa = 0;
-		h.tc = 0;
-		h.rd = 0;
-		h.ra = 0;
-		h.z = 0;
-		h.rcode = 0;
-		h.qdcount = 0;
-		h.ancount = 0;
-		h.nscount = 0;
-		h.arcount = 0;
+		print_request(request, bytesRead);
 
 		// Copy request to create response
-		memcpy(&response, &request, 512);
-		// Override header
-		memcpy(&response, &h, 12);
+		memcpy(response, request, bytesRead);
+		memcpy(&h, request, sizeof(header_struct));
+
+		uint16_t id_with_system_endianness;
+		memcpy(&id_with_system_endianness, &request, 2);
 
 		// found the solution using Wireshark
 		if (system_is_little_endian()) {
-			h.id = big_endian_to_little_endian(h.id);
-		} else {
-			h.id = h.id;
+			id_with_system_endianness = big_endian_to_little_endian(id_with_system_endianness);
 		}
-		std::cout << "id: " << h.id << std::endl;
-		std::cout << "id (hex): 0x" << std::hex << h.id << std::dec << std::endl;
 
-		std::cout << "qr: " << h.qr << std::endl;
-		std::cout << "opcode: " << h.opcode << std::endl;
+		std::cout << "id: " << id_with_system_endianness << std::endl;
+
+		h.qr = 1;
+
+		memcpy(response, &h, sizeof(header_struct));
 
 		// Send response
-		if (sendto(udpSocket, response, sizeof(response), 0, reinterpret_cast<struct sockaddr *>(&clientAddress), sizeof(clientAddress)) == -1) {
+		if (sendto(udpSocket, &h, sizeof(header_struct), 0, reinterpret_cast<struct sockaddr *>(&clientAddress), sizeof(clientAddress)) == -1) {
 			perror("Failed to send response");
 		}
 
