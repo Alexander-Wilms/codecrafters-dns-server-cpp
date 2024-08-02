@@ -49,6 +49,8 @@ Note: This section is for stages 2 and beyond.
       * Displays response header fields
       * Results in 2 DNS packets
       * Both have the same header
+      * For more detailed output:
+         * `dig @127.0.0.1 -p 2053 +noedns +qr +answer +tries=1 +header codecrafters.io`
 
       or
    * `nslookup -port=2053 codecrafters.io 127.0.0.1`
