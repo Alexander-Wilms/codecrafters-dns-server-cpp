@@ -28,6 +28,15 @@ struct __attribute__((packed)) header_struct {
 		}
 	}
 
+	uint8_t getOpcode() const {
+		return (flags >> 11) & 0xF;
+	}
+
+	void setOpcode(uint8_t opcode) {
+		flags &= 0xF8FF;			   // Clear the 4 bits for OPCODE field
+		flags |= (opcode & 0xF) << 11; // Set the 4 bits for OPCODE field
+	}
+
 	bool isAuthoritative() const {
 		return (flags >> 10) & 0x1;
 	}
@@ -83,6 +92,15 @@ struct __attribute__((packed)) header_struct {
 	void setReserved(uint8_t zField) {
 		flags &= 0xFF8F;			  // Clear the 3 bits for Z field
 		flags |= (zField & 0x7) << 4; // Set the 3 bits for Z field
+	}
+
+	uint8_t getRcode() const {
+		return flags & 0xF;
+	}
+
+	void setRcode(uint8_t rcode) {
+		flags &= 0xFFF0;	  // Clear the 4 bits for RCODE field
+		flags |= rcode & 0xF; // Set the 4 bits for RCODE field
 	}
 };
 
@@ -248,25 +266,39 @@ int main() {
 
 		// Copy request to create response
 		memcpy(response, request, bytesRead);
-		memcpy(&h_n, request, sizeof(header_struct));
-
-		h_h = convert_struct_byte_order(h_n, ntohs);
-
-		print_header_struct(h_h);
-		h_h.setQuery(true);
-		h_h.setRecursionDesired(false);
-		h_h.setReserved(0);
-
-#ifdef DEBUG
-		h_h.qdcount = 44;
-		h_h.ancount = 55;
-		h_h.nscount = 66;
-		h_h.arcount = 77;
-#endif
 
 		int questionLength = 0;
+
 		bool add_answer_section = true;
 		bool add_question_section = true | add_answer_section;
+		bool add_header_section = true | add_question_section;
+
+		if (add_header_section) {
+
+			memcpy(&h_n, request, sizeof(header_struct));
+
+			h_h = convert_struct_byte_order(h_n, ntohs);
+
+			print_header_struct(h_h);
+			h_h.setQuery(true);
+			h_h.setReserved(0);
+			if (h_h.getOpcode() == 0) {
+				h_h.setRcode(0);
+			} else {
+				h_h.setRcode(4);
+			}
+
+#ifdef DEBUG
+			h_h.qdcount = 44;
+			h_h.ancount = 55;
+			h_h.nscount = 66;
+			h_h.arcount = 77;
+#endif
+
+			h_n = convert_struct_byte_order(h_h, htons);
+			memcpy(response, &h_n, sizeof(header_struct));
+		}
+
 		question_struct q = {};
 
 		if (add_question_section) {
@@ -333,8 +365,6 @@ int main() {
 			h_h.ancount = 1;
 		}
 
-		h_n = convert_struct_byte_order(h_h, htons);
-		memcpy(response, &h_n, sizeof(header_struct));
 		print_message(response, responseSize);
 
 		// Send response
