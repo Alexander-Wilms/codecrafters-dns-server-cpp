@@ -51,6 +51,30 @@ Note: This section is for stages 2 and beyond.
       * Both have the same header
       * For more detailed output:
          * `dig @127.0.0.1 -p 2053 +noedns +qr +answer +tries=1 +header codecrafters.io`
+         * The expected output:
+         ```
+         $ dig @127.0.0.1 -p 2053 +noedns +qr +answer +tries=1 +header codecrafters.io
+
+         ; <<>> DiG 9.18.28-0ubuntu0.20.04.1-Ubuntu <<>> @127.0.0.1 -p 2053 +noedns +qr +answer +tries +header codecrafters.io
+         ; (1 server found)
+         ;; global options: +cmd
+         ;; Sending:
+         ;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 10650
+         ;; flags: rd ad; QUERY: 0, ANSWER: 0, AUTHORITY: 0, ADDITIONAL: 0
+
+         ;; QUESTION SECTION:
+
+         ;; QUERY SIZE: 12
+
+         ;; Got answer:
+         ;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 10650
+         ;; flags: qr; QUERY: 0, ANSWER: 0, AUTHORITY: 0, ADDITIONAL: 0
+
+         ;; Query time: 0 msec
+         ;; SERVER: 127.0.0.1#2053(127.0.0.1) (UDP)
+         ;; WHEN: Fri Aug 02 18:04:29 UTC 2024
+         ;; MSG SIZE  rcvd: 12
+         ```
 
       or
    * `nslookup -port=2053 codecrafters.io 127.0.0.1`
