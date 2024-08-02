@@ -102,6 +102,49 @@ Note: This section is for stages 2 and beyond.
          ;; WHEN: Fri Aug 02 21:10:14 UTC 2024
          ;; MSG SIZE  rcvd: 33
          ```
+         * Querying a real DNS server for reference:
+         ```
+         $ dig 127.0.0.1 +noedns +qr +answer +tries=1 +header abc.longassdomainname.com
+
+         ; <<>> DiG 9.18.28-0ubuntu0.20.04.1-Ubuntu <<>> 127.0.0.1 +noedns +qr +answer +tries=1 +header abc.longassdomainname.com
+         ;; global options: +cmd
+         ;; Sending:
+         ;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 42262
+         ;; flags: rd ad; QUERY: 0, ANSWER: 0, AUTHORITY: 0, ADDITIONAL: 0
+
+         ;; QUESTION SECTION:
+
+         ;; QUERY SIZE: 12
+
+         ;; communications error to 127.0.0.53#53: timed out
+         ;; Sending:
+         ;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 42262
+         ;; flags: rd ad; QUERY: 0, ANSWER: 0, AUTHORITY: 0, ADDITIONAL: 0
+
+         ;; QUESTION SECTION:
+
+         ;; QUERY SIZE: 12
+
+         ;; communications error to 168.63.129.16#53: timed out
+         ;; no servers could be reached
+
+         ;; Got answer:
+         ;; ->>HEADER<<- opcode: QUERY, status: NXDOMAIN, id: 54697
+         ;; flags: qr rd ra; QUERY: 1, ANSWER: 0, AUTHORITY: 1, ADDITIONAL: 1
+
+         ;; OPT PSEUDOSECTION:
+         ; EDNS: version: 0, flags:; udp: 65494
+         ;; QUESTION SECTION:
+         ;abc.longassdomainname.com.     IN      A
+
+         ;; AUTHORITY SECTION:
+         longassdomainname.com.  300     IN      SOA     ns71.domaincontrol.com. dns.jomax.net. 2023092000 28800 7200 604800 600
+
+         ;; Query time: 48 msec
+         ;; SERVER: 127.0.0.53#53(127.0.0.53) (UDP)
+         ;; WHEN: Fri Aug 02 23:57:43 UTC 2024
+         ;; MSG SIZE  rcvd: 122
+         ```
 
       or
    * `nslookup -port=2053 codecrafters.io 127.0.0.1`
