@@ -92,6 +92,15 @@ struct __attribute__((packed)) question_struct {
 	uint16_t _class;
 };
 
+struct __attribute__((packed)) answer_struct {
+	char name[512];
+	uint16_t type;
+	uint16_t _class;
+	uint32_t ttl;
+	uint16_t length;
+	char data[512];
+};
+
 typedef uint16_t (*byte_order_conversion_func)(uint16_t);
 
 header_struct convert_struct_byte_order(const header_struct &struct_with_network_byte_order, byte_order_conversion_func conversion_func) {
@@ -255,39 +264,73 @@ int main() {
 		h_h.arcount = 77;
 #endif
 
+		int questionLength = 0;
+		bool add_answer_section = true;
+		bool add_question_section = true | add_answer_section;
 		question_struct q = {};
-		//
-		// putting the hex code in the string without additional quotes results in this warning and results in the wrong value being stored:
-		// warning: hex escape sequence out of range
-		// Cf. https://www.unix.com/programming/149172-how-use-hex-escape-char-string-c.html
-		strcpy(q.name, "\x0c"
-					   "codecrafters"
-					   "\x02"
-					   "io");
-		print_hex(q.name, strlen(q.name));
-		q.type = htons((uint16_t)1);
-		q._class = htons((uint16_t)1);
 
-		print_hex(&q.type, 2);
-		print_hex(&q._class, 2);
-
-		bool add_question_section = true;
 		if (add_question_section) {
+
+			//
+			// putting the hex code in the string without additional quotes results in this warning and results in the wrong value being stored:
+			// warning: hex escape sequence out of range
+			// Cf. https://www.unix.com/programming/149172-how-use-hex-escape-char-string-c.html
+			strcpy(q.name, "\x0c"
+						   "codecrafters"
+						   "\x02"
+						   "io");
+			print_hex(q.name, strlen(q.name));
+			q.type = htons((uint16_t)1);
+			q._class = htons((uint16_t)1);
+
+			print_hex(&q.type, 2);
+			print_hex(&q._class, 2);
+
 			h_h.qdcount = 1;
 			print_header_struct(h_h);
 
-			memcpy(response + sizeof(header_struct), q.name, strlen(q.name) + 1);
-			memcpy(response + sizeof(header_struct) + strlen(q.name) + 1, &q.type, sizeof(q.type));
-			memcpy(response + sizeof(header_struct) + strlen(q.name) + 1 + 2, &q._class, sizeof(q._class));
 			// add 1 for the null terminator to fix this error
 			// ;; Warning: Message parser reports malformed message packet.
 			// ;; Got answer:
 			// ;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 48552
 			// ;; flags: qr; QUERY: 1, ANSWER: 0, AUTHORITY: 0, ADDITIONAL: 0
 			// ;; WARNING: Message has 3 extra bytes at end
-			int questionLength = strlen(q.name) + 1 + sizeof(q.type) + sizeof(q._class);
+			memcpy(response + sizeof(header_struct), q.name, strlen(q.name) + 1);
+			memcpy(response + sizeof(header_struct) + strlen(q.name) + 1, &q.type, sizeof(q.type));
+			memcpy(response + sizeof(header_struct) + strlen(q.name) + 1 + 2, &q._class, sizeof(q._class));
+
+			questionLength = strlen(q.name) + 1 + sizeof(q.type) + sizeof(q._class);
 			responseSize += questionLength;
 			print_hex(response + sizeof(header_struct), questionLength);
+		}
+
+		if (add_answer_section) {
+			answer_struct a = {};
+			strncpy(a.name, q.name, 512);
+			a.type = htons((uint16_t)1);
+			a._class = htons((uint16_t)1);
+			a.ttl = htons((uint32_t)60);
+			a.length = htons((uint16_t)4);
+			memcpy(a.data, "\x08"
+						   "\x08"
+						   "\x08"
+						   "\x08",
+				   4);
+
+			printf("name in answer: %s\n", a.name);
+
+			int answerLength = strlen(a.name) + 1 + sizeof(a.type) + sizeof(a._class) + sizeof(a.ttl) + sizeof(a.length) + 4;
+			responseSize += answerLength;
+
+			// this is necessary since the name car array is bigger tan te actual string
+			memcpy(response + sizeof(header_struct) + questionLength, a.name, strlen(a.name) + 1);
+			memcpy(response + sizeof(header_struct) + questionLength + strlen(a.name) + 1, &a.type, sizeof(a.type));
+			memcpy(response + sizeof(header_struct) + questionLength + strlen(a.name) + 1 + sizeof(a.type), &a._class, sizeof(a._class));
+			memcpy(response + sizeof(header_struct) + questionLength + strlen(a.name) + 1 + sizeof(a.type) + sizeof(a._class), &a.ttl, sizeof(a.ttl));
+			memcpy(response + sizeof(header_struct) + questionLength + strlen(a.name) + 1 + sizeof(a.type) + sizeof(a._class) + sizeof(a.ttl), &a.length, sizeof(a.length));
+			memcpy(response + sizeof(header_struct) + questionLength + strlen(a.name) + 1 + sizeof(a.type) + sizeof(a._class) + sizeof(a.ttl) + sizeof(a.length), &a.data, 4);
+
+			h_h.ancount = 1;
 		}
 
 		h_n = convert_struct_byte_order(h_h, htons);
