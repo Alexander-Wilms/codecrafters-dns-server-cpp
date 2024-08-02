@@ -312,10 +312,7 @@ int main() {
 			memcpy(&request_question, request + 12, sizeof(question_struct));
 			printf("request contains following question:\n%s\n", request_question.name);
 
-			strcpy(q.name, "\x0c"
-						   "codecrafters"
-						   "\x02"
-						   "io");
+			strcpy(q.name, request_question.name);
 			print_hex(q.name, strlen(q.name));
 			q.type = htons((uint16_t)1);
 			q._class = htons((uint16_t)1);
