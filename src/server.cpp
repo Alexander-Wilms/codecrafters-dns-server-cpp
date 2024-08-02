@@ -263,8 +263,8 @@ int main() {
 					   "\x02"
 					   "io");
 		print_hex(q.name, strlen(q.name));
-		q.type = htons(1);
-		q._class = htons(1);
+		q.type = 1;
+		q._class = 1;
 
 		print_hex(&q.type, 2);
 		print_hex(&q._class, 2);
