@@ -9,36 +9,114 @@
 
 // https://en.cppreference.com/w/cpp/language/bit_field
 struct __attribute__((packed)) header_struct {
-	uint16_t id : 16;
-	uint16_t qr : 1;
-	uint16_t opcode : 4;
-	uint16_t aa : 1;
-	uint16_t tc : 1;
-	uint16_t rd : 1;
-	uint16_t ra : 1;
-	uint16_t z : 3;
-	uint16_t rcode : 4;
-	uint16_t qdcount : 16;
-	uint16_t ancount : 16;
-	uint16_t nscount : 16;
-	uint16_t arcount : 16;
+	uint16_t id;
+	uint16_t flags;
+	uint16_t qdcount;
+	uint16_t ancount;
+	uint16_t nscount;
+	uint16_t arcount;
+
+	bool isQuery() const {
+		return (flags >> 15) & 0x1;
+	}
+
+	void setQuery(bool isQuery) {
+		if (isQuery) {
+			flags |= (0x1 << 15);
+		} else {
+			flags &= ~(0x1 << 15);
+		}
+	}
+
+	bool isAuthoritative() const {
+		return (flags >> 10) & 0x1;
+	}
+
+	void setAuthoritative(bool isAuthoritative) {
+		if (isAuthoritative) {
+			flags |= (0x1 << 10);
+		} else {
+			flags &= ~(0x1 << 10);
+		}
+	}
+
+	bool isTruncated() const {
+		return (flags >> 9) & 0x1;
+	}
+
+	void setTruncated(bool isTruncated) {
+		if (isTruncated) {
+			flags |= (0x1 << 9);
+		} else {
+			flags &= ~(0x1 << 9);
+		}
+	}
+
+	bool isRecursionDesired() const {
+		return (flags >> 8) & 0x1;
+	}
+
+	void setRecursionDesired(bool recursionDesired) {
+		if (recursionDesired) {
+			flags |= (0x1 << 8);
+		} else {
+			flags &= ~(0x1 << 8);
+		}
+	}
+
+	bool isRecursionAvailable() const {
+		return (flags >> 7) & 0x1;
+	}
+
+	void setRecursionAvailable(bool recursionAvailable) {
+		if (recursionAvailable) {
+			flags |= (0x1 << 7);
+		} else {
+			flags &= ~(0x1 << 7);
+		}
+	}
+
+	uint8_t getReserved() const {
+		return (flags >> 4) & 0x7;
+	}
+
+	void setReserved(uint8_t zField) {
+		flags &= 0xFF8F;			  // Clear the 3 bits for Z field
+		flags |= (zField & 0x7) << 4; // Set the 3 bits for Z field
+	}
 };
 
+typedef uint16_t (*byte_order_conversion_func)(uint16_t);
+
+header_struct convert_struct_byte_order(const header_struct &struct_with_network_byte_order, byte_order_conversion_func conversion_func) {
+	header_struct struct_with_host_byte_order;
+	struct_with_host_byte_order = struct_with_network_byte_order;
+	struct_with_host_byte_order.id = conversion_func(struct_with_network_byte_order.id);
+	struct_with_host_byte_order.flags = conversion_func(struct_with_network_byte_order.flags);
+	struct_with_host_byte_order.qdcount = conversion_func(struct_with_network_byte_order.qdcount);
+	struct_with_host_byte_order.ancount = conversion_func(struct_with_network_byte_order.ancount);
+	struct_with_host_byte_order.nscount = conversion_func(struct_with_network_byte_order.nscount);
+	struct_with_host_byte_order.arcount = conversion_func(struct_with_network_byte_order.arcount);
+
+	return struct_with_host_byte_order;
+}
+
 void print_header_struct(const header_struct &hs) {
-	// used Wiresark that ID uses a different byte order than my system
+	// used Wiresark to determine that ID uses a different byte order than my system
+	// this applies to all uint16_t fields
 	std::cout << "id: " << ntohs(hs.id) << std::endl;
-	std::cout << "qr: " << hs.qr << std::endl;
-	std::cout << "opcode: " << hs.opcode << std::endl;
-	std::cout << "aa: " << hs.aa << std::endl;
-	std::cout << "tc: " << hs.tc << std::endl;
-	std::cout << "rd: " << hs.rd << std::endl;
-	std::cout << "ra: " << hs.ra << std::endl;
-	std::cout << "z: " << hs.z << std::endl;
-	std::cout << "rcode: " << hs.rcode << std::endl;
-	std::cout << "qdcount: " << hs.qdcount << std::endl;
-	std::cout << "ancount: " << hs.ancount << std::endl;
-	std::cout << "nscount: " << hs.nscount << std::endl;
-	std::cout << "arcount: " << hs.arcount << std::endl;
+	std::cout << "qr: " << ((hs.flags >> 15) & 0x1) << std::endl;
+	std::cout << "opcode: " << ((hs.flags >> 11) & 0xF) << std::endl;
+	std::cout << "aa: " << ((hs.flags >> 10) & 0x1) << std::endl;
+	std::cout << "tc: " << ((hs.flags >> 9) & 0x1) << std::endl;
+	std::cout << "rd: " << ((hs.flags >> 8) & 0x1) << std::endl;
+	std::cout << "ra: " << ((hs.flags >> 7) & 0x1) << std::endl;
+	std::cout << "z: " << ((hs.flags >> 4) & 0x7) << std::endl;
+	std::cout << "rcode: " << (hs.flags & 0xF) << std::endl;
+	std::cout << "qdcount: " << ntohs(hs.qdcount) << std::endl;
+	std::cout << "ancount: " << ntohs(hs.ancount) << std::endl;
+	std::cout << "nscount: " << ntohs(hs.nscount) << std::endl;
+	std::cout << "arcount: " << ntohs(hs.arcount) << std::endl;
 }
 
 void print_hex(void *request, int bytesRead) {
@@ -125,7 +203,8 @@ int main() {
 	char response[512];
 	socklen_t clientAddrLen = sizeof(clientAddress);
 
-	header_struct h = {};
+	header_struct h_n = {};
+	header_struct h_h = {};
 	while (true) {
 		std::printf("↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓\n");
 
@@ -150,15 +229,29 @@ int main() {
 
 		// Copy request to create response
 		memcpy(response, request, bytesRead);
-		memcpy(&h, request, sizeof(header_struct));
+		memcpy(&h_n, request, sizeof(header_struct));
 
-		print_header_struct(h);
+		h_h = convert_struct_byte_order(h_n, ntohs);
 
-		memcpy(response, &h, sizeof(header_struct));
+		print_header_struct(h_h);
+		h_h.setQuery(true);
+		h_h.setRecursionDesired(false);
+		h_h.setReserved(0);
+
+#ifdef DEBUG
+		h_h.qdcount = 44;
+		h_h.ancount = 55;
+		h_h.nscount = 66;
+		h_h.arcount = 77;
+#endif
+		print_header_struct(h_h);
+
+		h_n = convert_struct_byte_order(h_h, htons);
+		memcpy(response, &h_n, sizeof(header_struct));
 		print_message(response, bytesRead);
 
 		// Send response
-		if (sendto(udpSocket, &h, sizeof(header_struct), 0, reinterpret_cast<struct sockaddr *>(&clientAddress), sizeof(clientAddress)) == -1) {
+		if (sendto(udpSocket, &h_n, sizeof(header_struct), 0, reinterpret_cast<struct sockaddr *>(&clientAddress), sizeof(clientAddress)) == -1) {
 			perror("Failed to send response");
 		}
 
