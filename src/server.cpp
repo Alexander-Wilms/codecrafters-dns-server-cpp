@@ -307,6 +307,11 @@ int main() {
 			// putting the hex code in the string without additional quotes results in this warning and results in the wrong value being stored:
 			// warning: hex escape sequence out of range
 			// Cf. https://www.unix.com/programming/149172-how-use-hex-escape-char-string-c.html
+
+			question_struct request_question;
+			memcpy(&request_question, request + 12, sizeof(question_struct));
+			printf("request contains following question:\n%s\n", request_question.name);
+
 			strcpy(q.name, "\x0c"
 						   "codecrafters"
 						   "\x02"
