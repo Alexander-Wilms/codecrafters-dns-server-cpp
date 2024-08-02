@@ -214,6 +214,8 @@ int main() {
 	header_struct h_n = {};
 	header_struct h_h = {};
 	while (true) {
+		int responseSize = sizeof(header_struct);
+
 		std::printf("↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓\n");
 
 		// Receive data
@@ -263,26 +265,30 @@ int main() {
 					   "\x02"
 					   "io");
 		print_hex(q.name, strlen(q.name));
-		q.type = 1;
-		q._class = 1;
+		q.type = htons((uint16_t)1);
+		q._class = htons((uint16_t)1);
 
 		print_hex(&q.type, 2);
 		print_hex(&q._class, 2);
 
-		h_h.qdcount = 1;
-		print_header_struct(h_h);
+		bool add_question_section = true;
+		if (add_question_section) {
+			h_h.qdcount = 1;
+			print_header_struct(h_h);
 
-		memcpy(response + sizeof(header_struct), &q, strlen(q.name));
-		memcpy(response + sizeof(header_struct) + strlen(q.name), &q.type, 2);
-		memcpy(response + sizeof(header_struct) + strlen(q.name) + 2, &q._class, 2);
-		// add 1 for the null terminator to fix this error
-		// ;; Warning: Message parser reports malformed message packet.
-		// ;; Got answer:
-		// ;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 48552
-		// ;; flags: qr; QUERY: 1, ANSWER: 0, AUTHORITY: 0, ADDITIONAL: 0
-		// ;; WARNING: Message has 3 extra bytes at end
-		int responseSize = sizeof(header_struct) + strlen(q.name) + 1 + 2 + 2;
-		print_hex(response + sizeof(header_struct), strlen(q.name) + 2 + 2);
+			memcpy(response + sizeof(header_struct), q.name, strlen(q.name) + 1);
+			memcpy(response + sizeof(header_struct) + strlen(q.name) + 1, &q.type, sizeof(q.type));
+			memcpy(response + sizeof(header_struct) + strlen(q.name) + 1 + 2, &q._class, sizeof(q._class));
+			// add 1 for the null terminator to fix this error
+			// ;; Warning: Message parser reports malformed message packet.
+			// ;; Got answer:
+			// ;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 48552
+			// ;; flags: qr; QUERY: 1, ANSWER: 0, AUTHORITY: 0, ADDITIONAL: 0
+			// ;; WARNING: Message has 3 extra bytes at end
+			int questionLength = strlen(q.name) + 1 + sizeof(q.type) + sizeof(q._class);
+			responseSize += questionLength;
+			print_hex(response + sizeof(header_struct), questionLength);
+		}
 
 		h_n = convert_struct_byte_order(h_h, htons);
 		memcpy(response, &h_n, sizeof(header_struct));
