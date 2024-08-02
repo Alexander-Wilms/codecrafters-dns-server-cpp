@@ -363,6 +363,9 @@ int main() {
 			memcpy(response + sizeof(header_struct) + questionLength + strlen(a.name) + 1 + sizeof(a.type) + sizeof(a._class) + sizeof(a.ttl) + sizeof(a.length), &a.data, 4);
 
 			h_h.ancount = 1;
+			// header was updated and needs to copied into the response again
+			h_n = convert_struct_byte_order(h_h, htons);
+			memcpy(response, &h_n, sizeof(header_struct));
 		}
 
 		print_message(response, responseSize);
