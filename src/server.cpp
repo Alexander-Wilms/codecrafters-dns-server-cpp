@@ -8,65 +8,45 @@
 #include <unistd.h>
 
 // https://en.cppreference.com/w/cpp/language/bit_field
-struct header_struct {
+struct __attribute__((packed)) header_struct {
 	uint16_t id : 16;
-	unsigned int qr : 1;
-	unsigned int opcode : 4;
-	unsigned int aa : 1;
-	unsigned int tc : 1;
-	unsigned int rd : 1;
-	unsigned int ra : 1;
-	unsigned int z : 3;
-	unsigned int rcode : 4;
-	unsigned int qdcount : 16;
-	unsigned int ancount : 16;
-	unsigned int nscount : 16;
-	unsigned int arcount : 16;
+	uint16_t qr : 1;
+	uint16_t opcode : 4;
+	uint16_t aa : 1;
+	uint16_t tc : 1;
+	uint16_t rd : 1;
+	uint16_t ra : 1;
+	uint16_t z : 3;
+	uint16_t rcode : 4;
+	uint16_t qdcount : 16;
+	uint16_t ancount : 16;
+	uint16_t nscount : 16;
+	uint16_t arcount : 16;
 };
 
-bool system_is_little_endian() {
-	short int number = 0x0102;
-	char *ptr = reinterpret_cast<char *>(&number);
-	bool little_endian = *ptr == 0x02; // If the least significant byte is 0x02, it's little-endian
-	if (little_endian) {
-		std::cout << "System is little endian" << std::endl;
-	} else {
-		std::cout << "System is NOT little endian" << std::endl;
-	}
-
-	return little_endian;
+void print_header_struct(const header_struct &hs) {
+	// used Wiresark that ID uses a different byte order than my system
+	std::cout << "id: " << ntohs(hs.id) << std::endl;
+	std::cout << "qr: " << hs.qr << std::endl;
+	std::cout << "opcode: " << hs.opcode << std::endl;
+	std::cout << "aa: " << hs.aa << std::endl;
+	std::cout << "tc: " << hs.tc << std::endl;
+	std::cout << "rd: " << hs.rd << std::endl;
+	std::cout << "ra: " << hs.ra << std::endl;
+	std::cout << "z: " << hs.z << std::endl;
+	std::cout << "rcode: " << hs.rcode << std::endl;
+	std::cout << "qdcount: " << hs.qdcount << std::endl;
+	std::cout << "ancount: " << hs.ancount << std::endl;
+	std::cout << "nscount: " << hs.nscount << std::endl;
+	std::cout << "arcount: " << hs.arcount << std::endl;
 }
 
-uint16_t little_endian_to_big_endian(uint16_t value) {
-	return (value >> 8) | (value << 8);
-}
+void print_hex(void *request, int bytesRead) {
 
-uint16_t big_endian_to_little_endian(uint16_t value) {
-	return (value << 8) | (value >> 8);
-}
-
-void print_request(char *request, int bytesRead) {
-	std::printf("message (hex):\n↓\n");
-	for (int i = 0; i < bytesRead; i++) {
-		std::printf("%02x ", static_cast<unsigned char>(request[i]));
-	}
-	std::printf("\n↑\n");
-
-	std::printf("message (ASCII):\n↓\n");
-	for (int i = 0; i < bytesRead; i++) {
-		if (isprint(request[i])) {
-			std::printf("%c", request[i]);
-		} else {
-			std::cout << ".";
-		}
-	}
-	std::printf("\n↑\n");
-
-	std::printf("message (hex, formatted):\n↓\n");
 	int byte_count = 0;
 
 	for (int i = 0; i < bytesRead; i++) {
-		std::printf("%02x ", static_cast<unsigned char>(request[i]));
+		std::printf("%02x ", static_cast<unsigned char>(((char *)request)[i]));
 
 		byte_count++;
 		if (byte_count % 16 == 0) {
@@ -74,11 +54,17 @@ void print_request(char *request, int bytesRead) {
 		}
 	}
 
-	std::printf("\n↑\n");
+	printf("\n");
+}
+void print_message(char *request, int bytesRead) {
+	std::printf("message (hex):\n↓\n");
+	print_hex(request, bytesRead);
 
-	std::printf("message (ASCII, formatted):\n↓\n");
+	std::printf("↑\n");
 
-	byte_count = 0;
+	std::printf("message (ASCII):\n↓\n");
+
+	int byte_count = 0;
 	for (int i = 0; i < bytesRead; i++) {
 		if (std::isprint(request[i])) {
 			printf("%2c ", request[i]);
@@ -160,25 +146,16 @@ int main() {
 		request[bytesRead] = '\0';
 		std::cout << "Received UDP packet with " << bytesRead << " bytes" << std::endl;
 
-		print_request(request, bytesRead);
+		print_message(request, bytesRead);
 
 		// Copy request to create response
 		memcpy(response, request, bytesRead);
 		memcpy(&h, request, sizeof(header_struct));
 
-		uint16_t id_with_system_endianness;
-		memcpy(&id_with_system_endianness, &request, 2);
-
-		// found the solution using Wireshark
-		if (system_is_little_endian()) {
-			id_with_system_endianness = big_endian_to_little_endian(id_with_system_endianness);
-		}
-
-		std::cout << "id: " << id_with_system_endianness << std::endl;
-
-		h.qr = 1;
+		print_header_struct(h);
 
 		memcpy(response, &h, sizeof(header_struct));
+		print_message(response, bytesRead);
 
 		// Send response
 		if (sendto(udpSocket, &h, sizeof(header_struct), 0, reinterpret_cast<struct sockaddr *>(&clientAddress), sizeof(clientAddress)) == -1) {
