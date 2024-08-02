@@ -86,6 +86,12 @@ struct __attribute__((packed)) header_struct {
 	}
 };
 
+struct __attribute__((packed)) question_struct {
+	char name[512];
+	uint16_t type;
+	uint16_t _class;
+};
+
 typedef uint16_t (*byte_order_conversion_func)(uint16_t);
 
 header_struct convert_struct_byte_order(const header_struct &struct_with_network_byte_order, byte_order_conversion_func conversion_func) {
@@ -123,16 +129,18 @@ void print_hex(void *request, int bytesRead) {
 
 	int byte_count = 0;
 
+	printf("→");
+
 	for (int i = 0; i < bytesRead; i++) {
 		std::printf("%02x ", static_cast<unsigned char>(((char *)request)[i]));
 
 		byte_count++;
-		if (byte_count % 16 == 0) {
+		if (byte_count % 16 == 0 && bytesRead > 16) {
 			std::cout << std::endl;
 		}
 	}
 
-	printf("\n");
+	printf("←\n");
 }
 void print_message(char *request, int bytesRead) {
 	std::printf("message (hex):\n↓\n");
@@ -244,14 +252,44 @@ int main() {
 		h_h.nscount = 66;
 		h_h.arcount = 77;
 #endif
+
+		question_struct q = {};
+		//
+		// putting the hex code in the string without additional quotes results in this warning and results in the wrong value being stored:
+		// warning: hex escape sequence out of range
+		// Cf. https://www.unix.com/programming/149172-how-use-hex-escape-char-string-c.html
+		strcpy(q.name, "\x0c"
+					   "codecrafters"
+					   "\x02"
+					   "io");
+		print_hex(q.name, strlen(q.name));
+		q.type = htons(1);
+		q._class = htons(1);
+
+		print_hex(&q.type, 2);
+		print_hex(&q._class, 2);
+
+		h_h.qdcount = 1;
 		print_header_struct(h_h);
+
+		memcpy(response + sizeof(header_struct), &q, strlen(q.name));
+		memcpy(response + sizeof(header_struct) + strlen(q.name), &q.type, 2);
+		memcpy(response + sizeof(header_struct) + strlen(q.name) + 2, &q._class, 2);
+		// add 1 for the null terminator to fix this error
+		// ;; Warning: Message parser reports malformed message packet.
+		// ;; Got answer:
+		// ;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 48552
+		// ;; flags: qr; QUERY: 1, ANSWER: 0, AUTHORITY: 0, ADDITIONAL: 0
+		// ;; WARNING: Message has 3 extra bytes at end
+		int responseSize = sizeof(header_struct) + strlen(q.name) + 1 + 2 + 2;
+		print_hex(response + sizeof(header_struct), strlen(q.name) + 2 + 2);
 
 		h_n = convert_struct_byte_order(h_h, htons);
 		memcpy(response, &h_n, sizeof(header_struct));
-		print_message(response, bytesRead);
+		print_message(response, responseSize);
 
 		// Send response
-		if (sendto(udpSocket, &h_n, sizeof(header_struct), 0, reinterpret_cast<struct sockaddr *>(&clientAddress), sizeof(clientAddress)) == -1) {
+		if (sendto(udpSocket, &response, responseSize, 0, reinterpret_cast<struct sockaddr *>(&clientAddress), sizeof(clientAddress)) == -1) {
 			perror("Failed to send response");
 		}
 
