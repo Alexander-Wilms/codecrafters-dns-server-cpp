@@ -270,8 +270,8 @@ int main() {
 		int questionLength = 0;
 
 		bool add_answer_section = true;
-		bool add_question_section = true | add_answer_section;
-		bool add_header_section = true | add_question_section;
+		bool add_question_section = true || add_answer_section;
+		bool add_header_section = true || add_question_section;
 
 		if (add_header_section) {
 
