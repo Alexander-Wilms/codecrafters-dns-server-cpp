@@ -333,7 +333,7 @@ void add_answer_section(std::string question, header_struct &h_h, char *response
 	memcpy(response + sizeof(header_struct) + questionLength + strlen(a.name) + 1 + sizeof(a.type) + sizeof(a._class) + sizeof(a.ttl), &a.length, sizeof(a.length));
 	memcpy(response + sizeof(header_struct) + questionLength + strlen(a.name) + 1 + sizeof(a.type) + sizeof(a._class) + sizeof(a.ttl) + sizeof(a.length), &a.data, 4);
 
-	h_h.ancount = 1;
+	h_h.ancount += 1;
 	// header was updated and needs to copied into the response again
 
 	h_n = convert_struct_byte_order(h_h, htons);
