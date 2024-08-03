@@ -285,6 +285,7 @@ std::vector<std::vector<char>> extract_questions(char *questions, int questions_
 			q_byte_idx += 4;
 			name_idx_offset = q_byte_idx;
 			currently_constructing_name_from_labels = false;
+			name_so_far = "";
 			continue;
 		}
 		printf("\nbyte: 0x%02x\n", octet);
