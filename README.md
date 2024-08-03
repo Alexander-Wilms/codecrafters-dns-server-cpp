@@ -145,7 +145,66 @@ Note: This section is for stages 2 and beyond.
          ;; WHEN: Fri Aug 02 23:57:43 UTC 2024
          ;; MSG SIZE  rcvd: 122
          ```
+         * Example of querying multiple domains:
+         ```
+         $ dig 127.0.0.1 +noedns +qr +answer +tries=1 +header abc.longassdomainname.com def.longassdomainname.com
 
+         ; <<>> DiG 9.18.28-0ubuntu0.20.04.1-Ubuntu <<>> 127.0.0.1 +noedns +qr +answer +tries=1 +header abc.longassdomainname.com def.longassdomainname.com
+         ;; global options: +cmd
+         ;; Sending:
+         ;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 42207
+         ;; flags: rd ad; QUERY: 0, ANSWER: 0, AUTHORITY: 0, ADDITIONAL: 0
+
+         ;; QUESTION SECTION:
+
+         ;; QUERY SIZE: 12
+
+         ;; communications error to 127.0.0.53#53: timed out
+         ;; Sending:
+         ;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 42207
+         ;; flags: rd ad; QUERY: 0, ANSWER: 0, AUTHORITY: 0, ADDITIONAL: 0
+
+         ;; QUESTION SECTION:
+
+         ;; QUERY SIZE: 12
+
+         ;; communications error to 168.63.129.16#53: timed out
+         ;; no servers could be reached
+
+         ;; Got answer:
+         ;; ->>HEADER<<- opcode: QUERY, status: NXDOMAIN, id: 60308
+         ;; flags: qr rd ra; QUERY: 1, ANSWER: 0, AUTHORITY: 1, ADDITIONAL: 1
+
+         ;; OPT PSEUDOSECTION:
+         ; EDNS: version: 0, flags:; udp: 65494
+         ;; QUESTION SECTION:
+         ;abc.longassdomainname.com.     IN      A
+
+         ;; AUTHORITY SECTION:
+         longassdomainname.com.  300     IN      SOA     ns71.domaincontrol.com. dns.jomax.net. 2023092000 28800 7200 604800 600
+
+         ;; Query time: 52 msec
+         ;; SERVER: 127.0.0.53#53(127.0.0.53) (UDP)
+         ;; WHEN: Sat Aug 03 00:01:15 UTC 2024
+         ;; MSG SIZE  rcvd: 122
+
+         ;; Got answer:
+         ;; ->>HEADER<<- opcode: QUERY, status: NXDOMAIN, id: 13977
+         ;; flags: qr rd ra; QUERY: 1, ANSWER: 0, AUTHORITY: 1, ADDITIONAL: 1
+
+         ;; OPT PSEUDOSECTION:
+         ; EDNS: version: 0, flags:; udp: 65494
+         ;; QUESTION SECTION:
+         ;def.longassdomainname.com.     IN      A
+
+         ;; AUTHORITY SECTION:
+         longassdomainname.com.  300     IN      SOA     ns71.domaincontrol.com. dns.jomax.net. 2023092000 28800 7200 604800 600
+
+         ;; Query time: 48 msec
+         ;; SERVER: 127.0.0.53#53(127.0.0.53) (UDP)
+         ;; WHEN: Sat Aug 03 00:01:15 UTC 2024
+         ;; MSG SIZE  rcvd: 122
+         ```
       or
    * `nslookup -port=2053 codecrafters.io 127.0.0.1`
       * Results in 4 DNS packets
