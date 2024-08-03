@@ -7,6 +7,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <unordered_map>
+#include <vector>
 
 #define PORT 2053
 
@@ -155,11 +156,11 @@ void print_header_struct(const header_struct &hs) {
 	std::cout << "arcount: " << ntohs(hs.arcount) << std::endl;
 }
 
-void print_hex(void *request, int bytesRead) {
+void print_hex(std::string var_name, void *request, int bytesRead) {
 
 	int byte_count = 0;
 
-	printf("→");
+	printf("%s:\n↓\n", var_name.c_str());
 
 	for (int i = 0; i < bytesRead; i++) {
 		std::printf("%02x ", static_cast<unsigned char>(((char *)request)[i]));
@@ -170,15 +171,12 @@ void print_hex(void *request, int bytesRead) {
 		}
 	}
 
-	printf("←\n");
+	std::printf("\n↑\n");
 }
-void print_message(char *request, int bytesRead) {
-	std::printf("message (hex):\n↓\n");
-	print_hex(request, bytesRead);
+void print_message(std::string name, char *request, int bytesRead) {
+	print_hex(name, request, bytesRead);
 
-	std::printf("↑\n");
-
-	std::printf("message (ASCII):\n↓\n");
+	std::printf("%s (ASCII):\n↓\n", name.c_str());
 
 	int byte_count = 0;
 	for (int i = 0; i < bytesRead; i++) {
@@ -194,6 +192,152 @@ void print_message(char *request, int bytesRead) {
 	}
 
 	std::printf("\n↑\n");
+}
+
+void add_question_section(const char *question, header_struct &h_h, char *response, int &responseSize, int &questionLength) {
+	// putting the hex code in the string without additional quotes results in this warning and results in the wrong value being stored:
+	// warning: hex escape sequence out of range
+	// Cf. https://www.unix.com/programming/149172-how-use-hex-escape-char-string-c.html
+
+	question_struct request_question;
+
+	question_struct q = {};
+	strcpy(q.name, question);
+
+	// https://www.rfc-editor.org/rfc/rfc1035#section-3.2.2
+	std::unordered_map<std::string, uint16_t> typeToValue = {
+		{"A", 1},
+		{"NS", 2},
+		{"MD", 3},
+		{"MF", 4},
+		{"CNAME", 5},
+		{"SOA", 6},
+		{"MB", 7},
+		{"MG", 8},
+		{"MR", 9},
+		{"NULL", 10},
+		{"WKS", 11},
+		{"PTR", 12},
+		{"HINFO", 13},
+		{"MINFO", 14},
+		{"MX", 15},
+		{"TXT", 16}};
+	uint16_t numeric_type = typeToValue["A"];
+	q.type = htons(numeric_type);
+	// class should always be 1
+	// https://www.rfc-editor.org/rfc/rfc1035#section-3.2.4
+	q._class = htons((uint16_t)1);
+
+	print_hex("q.type", &q.type, 2);
+	print_hex("q._class", &q._class, 2);
+
+	h_h.qdcount = 1;
+	print_header_struct(h_h);
+
+	// add 1 for the null terminator to fix this error
+	// ;; Warning: Message parser reports malformed message packet.
+	// ;; Got answer:
+	// ;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 48552
+	// ;; flags: qr; QUERY: 1, ANSWER: 0, AUTHORITY: 0, ADDITIONAL: 0
+	// ;; WARNING: Message has 3 extra bytes at end
+	memcpy(response + sizeof(header_struct), q.name, strlen(q.name) + 1);
+	memcpy(response + sizeof(header_struct) + strlen(q.name) + 1, &q.type, sizeof(q.type));
+	memcpy(response + sizeof(header_struct) + strlen(q.name) + 1 + 2, &q._class, sizeof(q._class));
+
+	questionLength = strlen(q.name) + 1 + sizeof(q.type) + sizeof(q._class);
+	responseSize += questionLength;
+	print_hex("question", response + sizeof(header_struct), questionLength);
+}
+
+std::vector<std::vector<char>> extract_questions(char *questions, int questions_buffer_size) {
+	printf("extract_questions()\n");
+	std::vector<std::vector<char>> questions_list;
+	char extracted_name[512];
+	std::string name_so_far = "";
+	char current_label[512];
+	int name_idx_offset = 0;
+	int label_length = 0;
+	bool done_extracting_names = false;
+	uint8_t octet;
+	int name_length = 0;
+	enum enum_name_label_or_pointer { label,
+									  pointer };
+	enum_name_label_or_pointer name_label_or_pointer;
+	for (int q_byte_idx = 0; q_byte_idx < questions_buffer_size; q_byte_idx++) {
+		octet = questions[q_byte_idx];
+		if (octet == 0) {
+			// The domain name terminates with the
+			// zero length octet for the null label of the root.
+			// https://www.rfc-editor.org/rfc/rfc1035#section-4.1.2
+			break;
+		}
+		printf("%02x\n", octet);
+
+		if (q_byte_idx == name_idx_offset && ((0b11000000 & octet) == 0)) {
+
+			label_length = octet;
+			name_label_or_pointer = label;
+			printf("found label of length %d\n", octet);
+			memcpy(current_label, &questions[q_byte_idx], 1 + label_length);
+			current_label[1 + label_length] = 0;
+			printf("current label: %s\n", current_label);
+
+			name_so_far += std::string(current_label);
+
+			memcpy(extracted_name + name_idx_offset, &questions[q_byte_idx] + name_idx_offset, 1 + label_length); // add one for the lengt octet
+			name_idx_offset += 1 + label_length;
+			q_byte_idx += label_length;
+
+			printf("extracted name so far: %s\n", name_so_far.c_str());
+			print_hex("extracted name so far", (void *)name_so_far.c_str(), name_so_far.length());
+		} else if (q_byte_idx > name_idx_offset) {
+			break;
+		}
+	}
+
+	printf("extracted name so far: %s\n", name_so_far.c_str());
+	print_hex("extracted name so far", (void *)name_so_far.c_str(), name_so_far.length());
+
+	std::vector<char> complete_name;
+	for (int i = 0; i < name_so_far.length(); i++) {
+		complete_name.push_back(name_so_far[i]);
+	}
+	questions_list.push_back(complete_name);
+	return questions_list;
+}
+
+void add_answer_section(std::string question, header_struct &h_h, char *response, int &responseSize, int &questionLength, header_struct &h_n) {
+	answer_struct a = {};
+	strncpy(a.name, question.c_str(),
+			512);
+	a.type = htons((uint16_t)1);
+	a._class = htons((uint16_t)1);
+	a.ttl = htons((uint32_t)60);
+	a.length = htons((uint16_t)4);
+	memcpy(a.data, "\x08"
+				   "\x08"
+				   "\x08"
+				   "\x08",
+		   4);
+
+	printf("name in answer: %s\n", a.name);
+
+	int answerLength = strlen(a.name) + 1 + sizeof(a.type) + sizeof(a._class) + sizeof(a.ttl) + sizeof(a.length) + 4;
+	responseSize += answerLength;
+
+	// this is necessary since the name car array is bigger tan te actual string
+	memcpy(response + sizeof(header_struct) + questionLength, a.name, strlen(a.name) + 1);
+	memcpy(response + sizeof(header_struct) + questionLength + strlen(a.name) + 1, &a.type, sizeof(a.type));
+	memcpy(response + sizeof(header_struct) + questionLength + strlen(a.name) + 1 + sizeof(a.type), &a._class, sizeof(a._class));
+	memcpy(response + sizeof(header_struct) + questionLength + strlen(a.name) + 1 + sizeof(a.type) + sizeof(a._class), &a.ttl, sizeof(a.ttl));
+	memcpy(response + sizeof(header_struct) + questionLength + strlen(a.name) + 1 + sizeof(a.type) + sizeof(a._class) + sizeof(a.ttl), &a.length, sizeof(a.length));
+	memcpy(response + sizeof(header_struct) + questionLength + strlen(a.name) + 1 + sizeof(a.type) + sizeof(a._class) + sizeof(a.ttl) + sizeof(a.length), &a.data, 4);
+
+	h_h.ancount = 1;
+	// header was updated and needs to copied into the response again
+
+	h_n = convert_struct_byte_order(h_h, htons);
+	memcpy(response, &h_n, sizeof(header_struct));
 }
 
 int main() {
@@ -261,16 +405,16 @@ int main() {
 		request[bytesRead] = '\0';
 		std::cout << "Received UDP packet with " << bytesRead << " bytes" << std::endl;
 
-		print_message(request, bytesRead);
+		print_message("request", request, bytesRead);
 
 		// Copy request to create response
 		memcpy(response, request, bytesRead);
 
 		int questionLength = 0;
 
-		bool add_answer_section = true;
-		bool add_question_section = true || add_answer_section;
-		bool add_header_section = true || add_question_section;
+		bool answer_section_enabled = true;
+		bool question_section_enabled = true || answer_section_enabled;
+		bool add_header_section = true || question_section_enabled;
 
 		if (add_header_section) {
 			memcpy(&h_n, request, sizeof(header_struct));
@@ -297,101 +441,30 @@ int main() {
 			memcpy(response, &h_n, sizeof(header_struct));
 		}
 
-		question_struct q = {};
+		char questions[512];
+		memcpy(&questions, request + 12, sizeof(request) - 12);
 
-		if (add_question_section) {
+		print_hex("questions", questions, sizeof(request) - 12);
 
-			//
-			// putting the hex code in the string without additional quotes results in this warning and results in the wrong value being stored:
-			// warning: hex escape sequence out of range
-			// Cf. https://www.unix.com/programming/149172-how-use-hex-escape-char-string-c.html
-
-			question_struct request_question;
-			char questions[512];
-			memcpy(&questions, request + 12, sizeof(request) - 12);
-			printf("request contains the following questions:\n%s\n", questions);
-			print_hex(questions, strlen(questions));
-
-			strcpy(q.name, questions);
-
-			// https://www.rfc-editor.org/rfc/rfc1035#section-3.2.2
-			std::unordered_map<std::string, uint16_t> typeToValue = {
-				{"A", 1},
-				{"NS", 2},
-				{"MD", 3},
-				{"MF", 4},
-				{"CNAME", 5},
-				{"SOA", 6},
-				{"MB", 7},
-				{"MG", 8},
-				{"MR", 9},
-				{"NULL", 10},
-				{"WKS", 11},
-				{"PTR", 12},
-				{"HINFO", 13},
-				{"MINFO", 14},
-				{"MX", 15},
-				{"TXT", 16}};
-			uint16_t numeric_type = typeToValue["A"];
-			q.type = htons(numeric_type);
-			// class should always be 1
-			// https://www.rfc-editor.org/rfc/rfc1035#section-3.2.4
-			q._class = htons((uint16_t)1);
-
-			print_hex(&q.type, 2);
-			print_hex(&q._class, 2);
-
-			h_h.qdcount = 1;
-			print_header_struct(h_h);
-
-			// add 1 for the null terminator to fix this error
-			// ;; Warning: Message parser reports malformed message packet.
-			// ;; Got answer:
-			// ;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 48552
-			// ;; flags: qr; QUERY: 1, ANSWER: 0, AUTHORITY: 0, ADDITIONAL: 0
-			// ;; WARNING: Message has 3 extra bytes at end
-			memcpy(response + sizeof(header_struct), q.name, strlen(q.name) + 1);
-			memcpy(response + sizeof(header_struct) + strlen(q.name) + 1, &q.type, sizeof(q.type));
-			memcpy(response + sizeof(header_struct) + strlen(q.name) + 1 + 2, &q._class, sizeof(q._class));
-
-			questionLength = strlen(q.name) + 1 + sizeof(q.type) + sizeof(q._class);
-			responseSize += questionLength;
-			print_hex(response + sizeof(header_struct), questionLength);
+		printf("request contains the following questions:\n");
+		std::vector<std::vector<char>> questions_list = extract_questions(questions, sizeof(request) - 12);
+		if (question_section_enabled) {
+			for (std::vector<char> question_char_vec : questions_list) {
+				std::string question(question_char_vec.begin(), question_char_vec.end());
+				print_hex("adding question", (void *)question.c_str(), question.length());
+				add_question_section(question.c_str(), h_h, response, responseSize, questionLength);
+			}
 		}
 
-		if (add_answer_section) {
-			answer_struct a = {};
-			strncpy(a.name, q.name, 512);
-			a.type = htons((uint16_t)1);
-			a._class = htons((uint16_t)1);
-			a.ttl = htons((uint32_t)60);
-			a.length = htons((uint16_t)4);
-			memcpy(a.data, "\x08"
-						   "\x08"
-						   "\x08"
-						   "\x08",
-				   4);
-
-			printf("name in answer: %s\n", a.name);
-
-			int answerLength = strlen(a.name) + 1 + sizeof(a.type) + sizeof(a._class) + sizeof(a.ttl) + sizeof(a.length) + 4;
-			responseSize += answerLength;
-
-			// this is necessary since the name car array is bigger tan te actual string
-			memcpy(response + sizeof(header_struct) + questionLength, a.name, strlen(a.name) + 1);
-			memcpy(response + sizeof(header_struct) + questionLength + strlen(a.name) + 1, &a.type, sizeof(a.type));
-			memcpy(response + sizeof(header_struct) + questionLength + strlen(a.name) + 1 + sizeof(a.type), &a._class, sizeof(a._class));
-			memcpy(response + sizeof(header_struct) + questionLength + strlen(a.name) + 1 + sizeof(a.type) + sizeof(a._class), &a.ttl, sizeof(a.ttl));
-			memcpy(response + sizeof(header_struct) + questionLength + strlen(a.name) + 1 + sizeof(a.type) + sizeof(a._class) + sizeof(a.ttl), &a.length, sizeof(a.length));
-			memcpy(response + sizeof(header_struct) + questionLength + strlen(a.name) + 1 + sizeof(a.type) + sizeof(a._class) + sizeof(a.ttl) + sizeof(a.length), &a.data, 4);
-
-			h_h.ancount = 1;
-			// header was updated and needs to copied into the response again
-			h_n = convert_struct_byte_order(h_h, htons);
-			memcpy(response, &h_n, sizeof(header_struct));
+		if (answer_section_enabled) {
+			for (std::vector<char> question_char_vec : questions_list) {
+				std::string question(question_char_vec.begin(), question_char_vec.end());
+				print_hex("adding answer to question", (void *)question.c_str(), question.length());
+				add_answer_section(question, h_h, response, responseSize, questionLength, h_n);
+			}
 		}
 
-		print_message(response, responseSize);
+		print_message("response", response, responseSize);
 
 		// Send response
 		if (sendto(udpSocket, &response, responseSize, 0, reinterpret_cast<struct sockaddr *>(&clientAddress), sizeof(clientAddress)) == -1) {
