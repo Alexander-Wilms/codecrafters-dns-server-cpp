@@ -285,28 +285,31 @@ std::vector<std::vector<char>> extract_questions(char *questions, int questions_
 			q_byte_idx += 5;
 			name_idx_offset = q_byte_idx;
 			currently_constructing_name_from_labels = false;
+			continue;
 		}
 		printf("\nbyte: 0x%02x\n", octet);
 
-		if (octet != 0 && q_byte_idx == name_idx_offset && ((0b11000000 & octet) == 0)) {
-			currently_constructing_name_from_labels = true;
-			label_length = octet;
-			name_label_or_pointer = label;
-			printf("found label of length %d\n", octet);
-			memcpy(current_label, &questions[q_byte_idx], 1 + label_length);
-			current_label[1 + label_length] = 0;
-			printf("current label: %s\n", current_label);
+		if (octet != 0) {
+			if (q_byte_idx == name_idx_offset && ((0b11000000 & octet) == 0)) {
+				currently_constructing_name_from_labels = true;
+				label_length = octet;
+				name_label_or_pointer = label;
+				printf("found label of length %d\n", octet);
+				memcpy(current_label, &questions[q_byte_idx], 1 + label_length);
+				current_label[1 + label_length] = 0;
+				printf("current label: %s\n", current_label);
 
-			name_so_far += std::string(current_label);
+				name_so_far += std::string(current_label);
 
-			memcpy(extracted_name + name_idx_offset, &questions[q_byte_idx] + name_idx_offset, 1 + label_length); // add one for the lengt octet
-			name_idx_offset += 1 + label_length;
-			q_byte_idx += label_length;
+				memcpy(extracted_name + name_idx_offset, &questions[q_byte_idx] + name_idx_offset, 1 + label_length); // add one for the lengt octet
+				name_idx_offset += 1 + label_length;
+				q_byte_idx += label_length;
 
-			printf("extracted name so far: %s\n", name_so_far.c_str());
-			print_hex("extracted name so far", (void *)name_so_far.c_str(), name_so_far.length());
-		} else if (q_byte_idx > name_idx_offset) {
-			printf("octet is 0x00, end of names reaced\n");
+				printf("extracted name so far: %s\n", name_so_far.c_str());
+				print_hex("extracted name so far", (void *)name_so_far.c_str(), name_so_far.length());
+			}
+		} else {
+			printf("octet is 0x00, end of names reached\n");
 			break;
 		}
 	}
