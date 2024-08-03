@@ -3,6 +3,7 @@
 #include <cstring>
 #include <ios>
 #include <iostream>
+#include <map>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -264,6 +265,9 @@ std::vector<std::vector<char>> extract_questions(char *questions, int questions_
 									  pointer };
 	bool currently_constructing_name_from_labels = true;
 	enum_name_label_or_pointer name_label_or_pointer;
+std:
+	// map is used to access previous labels referenced by pointers used for compression
+	std::map<int, std::string> found_labels;
 
 	for (int q_byte_idx = 0; q_byte_idx < questions_buffer_size; q_byte_idx++) {
 		octet = questions[q_byte_idx];
@@ -302,6 +306,7 @@ std::vector<std::vector<char>> extract_questions(char *questions, int questions_
 				memcpy(current_label, &questions[q_byte_idx], 1 + label_length);
 				current_label[1 + label_length] = 0;
 				printf("current label: %s\n", current_label);
+				found_labels.insert({q_byte_idx + 12, current_label});
 
 				name_so_far += std::string(current_label);
 
@@ -315,6 +320,15 @@ std::vector<std::vector<char>> extract_questions(char *questions, int questions_
 				// pointer must begin with two one bits
 				// https://www.rfc-editor.org/rfc/rfc1035#section-4.1.4
 				printf("this is a pointer\n");
+				uint8_t first_offset_byte = questions[q_byte_idx] & 0b00111111;
+				uint8_t second_offset_byte = questions[q_byte_idx + 1];
+
+				uint16_t offset = 0;
+
+				offset |= ((uint16_t)first_offset_byte) << 8; // Shift first_offset_byte to the left by 8 bits
+				offset |= (uint16_t)second_offset_byte;		  // Perform a bitwise OR with second_offset_byte
+
+				printf("the pointer has an offset of %d bytes from the start of the entire message\n", offset);
 			}
 		} else {
 			printf("octet is 0x00, end of names reached\n");
