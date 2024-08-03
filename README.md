@@ -45,6 +45,7 @@ Note: This section is for stages 2 and beyond.
    * [One has to use `127.0.0.1` instead of `localhost`](https://stackoverflow.com/questions/9696129/how-to-send-only-one-udp-packet-with-netcat#comment54050586_16568803)
 
 * Sending DNS request messages:
+   * Ubuntu: `dnsutils` package
    * `dig @127.0.0.1 -p 2053 +noedns codecrafters.io`
       * Displays response header fields
       * Results in 2 DNS packets
