@@ -6,6 +6,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <unordered_map>
 
 #define PORT 2053
 
@@ -306,18 +307,35 @@ int main() {
 			// Cf. https://www.unix.com/programming/149172-how-use-hex-escape-char-string-c.html
 
 			question_struct request_question;
-			memcpy(&request_question, request + 12, sizeof(question_struct));
-			printf("request contains following question:\n%s\n", request_question.name);
+			char questions[512];
+			memcpy(&questions, request + 12, sizeof(request) - 12);
+			printf("request contains the following questions:\n%s\n", questions);
+			print_hex(questions, strlen(questions));
 
-			// extracting the name from the request does not yet work
-			// strcpy(q.name, request_question.name);
-			strcpy(q.name, "\x0c"
-						   "codecrafters"
-						   "\x02"
-						   "io");
+			strcpy(q.name, questions);
 
-			print_hex(q.name, strlen(q.name));
-			q.type = htons((uint16_t)1);
+			// https://www.rfc-editor.org/rfc/rfc1035#section-3.2.2
+			std::unordered_map<std::string, uint16_t> typeToValue = {
+				{"A", 1},
+				{"NS", 2},
+				{"MD", 3},
+				{"MF", 4},
+				{"CNAME", 5},
+				{"SOA", 6},
+				{"MB", 7},
+				{"MG", 8},
+				{"MR", 9},
+				{"NULL", 10},
+				{"WKS", 11},
+				{"PTR", 12},
+				{"HINFO", 13},
+				{"MINFO", 14},
+				{"MX", 15},
+				{"TXT", 16}};
+			uint16_t numeric_type = typeToValue["A"];
+			q.type = htons(numeric_type);
+			// class should always be 1
+			// https://www.rfc-editor.org/rfc/rfc1035#section-3.2.4
 			q._class = htons((uint16_t)1);
 
 			print_hex(&q.type, 2);
