@@ -282,7 +282,7 @@ std::vector<std::vector<char>> extract_questions(char *questions, int questions_
 			}
 			questions_list.push_back(complete_name);
 
-			q_byte_idx += 5;
+			q_byte_idx += 4;
 			name_idx_offset = q_byte_idx;
 			currently_constructing_name_from_labels = false;
 			continue;
