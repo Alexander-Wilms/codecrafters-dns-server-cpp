@@ -262,19 +262,34 @@ std::vector<std::vector<char>> extract_questions(char *questions, int questions_
 	int name_length = 0;
 	enum enum_name_label_or_pointer { label,
 									  pointer };
+	bool currently_constructing_name_from_labels = true;
 	enum_name_label_or_pointer name_label_or_pointer;
+
 	for (int q_byte_idx = 0; q_byte_idx < questions_buffer_size; q_byte_idx++) {
 		octet = questions[q_byte_idx];
-		if (octet == 0) {
+		if (octet == 0 && currently_constructing_name_from_labels) {
 			// The domain name terminates with the
 			// zero length octet for the null label of the root.
 			// https://www.rfc-editor.org/rfc/rfc1035#section-4.1.2
-			break;
+
+			printf("✓ extraction of name complete\n");
+			printf("extracted name: %s\n", name_so_far.c_str());
+			print_hex("extracted name", (void *)name_so_far.c_str(), name_so_far.length());
+
+			std::vector<char> complete_name;
+			for (int i = 0; i < name_so_far.length(); i++) {
+				complete_name.push_back(name_so_far[i]);
+			}
+			questions_list.push_back(complete_name);
+
+			q_byte_idx += 5;
+			name_idx_offset = q_byte_idx;
+			currently_constructing_name_from_labels = false;
 		}
-		printf("%02x\n", octet);
+		printf("\nbyte: 0x%02x\n", octet);
 
-		if (q_byte_idx == name_idx_offset && ((0b11000000 & octet) == 0)) {
-
+		if (octet != 0 && q_byte_idx == name_idx_offset && ((0b11000000 & octet) == 0)) {
+			currently_constructing_name_from_labels = true;
 			label_length = octet;
 			name_label_or_pointer = label;
 			printf("found label of length %d\n", octet);
@@ -291,18 +306,11 @@ std::vector<std::vector<char>> extract_questions(char *questions, int questions_
 			printf("extracted name so far: %s\n", name_so_far.c_str());
 			print_hex("extracted name so far", (void *)name_so_far.c_str(), name_so_far.length());
 		} else if (q_byte_idx > name_idx_offset) {
+			printf("octet is 0x00, end of names reaced\n");
 			break;
 		}
 	}
 
-	printf("extracted name so far: %s\n", name_so_far.c_str());
-	print_hex("extracted name so far", (void *)name_so_far.c_str(), name_so_far.length());
-
-	std::vector<char> complete_name;
-	for (int i = 0; i < name_so_far.length(); i++) {
-		complete_name.push_back(name_so_far[i]);
-	}
-	questions_list.push_back(complete_name);
 	return questions_list;
 }
 
