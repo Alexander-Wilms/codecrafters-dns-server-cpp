@@ -7,6 +7,8 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#define PORT 2053
+
 // https://en.cppreference.com/w/cpp/language/bit_field
 struct __attribute__((packed)) header_struct {
 	uint16_t id;
@@ -222,7 +224,7 @@ int main() {
 
 	sockaddr_in serv_addr = {
 		.sin_family = AF_INET,
-		.sin_port = htons(2053),
+		.sin_port = htons(PORT),
 		.sin_addr = {htonl(INADDR_ANY)},
 	};
 	if (
@@ -253,11 +255,7 @@ int main() {
 		}
 
 		uint16_t source_port = ntohs(reinterpret_cast<struct sockaddr_in *>(&clientAddress)->sin_port);
-
 		uint16_t destination_port = htons(2053);
-
-		std::cout << "Source port: " << source_port << std::endl;
-		std::cout << "Destination port: " << destination_port << std::endl;
 
 		request[bytesRead] = '\0';
 		std::cout << "Received UDP packet with " << bytesRead << " bytes" << std::endl;
@@ -274,7 +272,6 @@ int main() {
 		bool add_header_section = true || add_question_section;
 
 		if (add_header_section) {
-
 			memcpy(&h_n, request, sizeof(header_struct));
 
 			h_h = convert_struct_byte_order(h_n, ntohs);
