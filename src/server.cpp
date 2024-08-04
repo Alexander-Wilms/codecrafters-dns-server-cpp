@@ -247,7 +247,7 @@ void add_question_section(const char *question, header_struct &h_h, char *respon
 	// ;; WARNING: Message has 3 extra bytes at end
 	memcpy(response + sizeof(header_struct) + questionLength, q.name, strlen(q.name) + 1);
 	memcpy(response + sizeof(header_struct) + questionLength + strlen(q.name) + 1, &q.type, sizeof(q.type));
-	memcpy(response + sizeof(header_struct) + questionLength + strlen(q.name) + 1 + 2, &q._class, sizeof(q._class));
+	memcpy(response + sizeof(header_struct) + questionLength + strlen(q.name) + 1 + sizeof(q.type), &q._class, sizeof(q._class));
 
 	int additionalQuestionLength = strlen(q.name) + 1 + sizeof(q.type) + sizeof(q._class);
 	questionLength += additionalQuestionLength;
@@ -539,9 +539,9 @@ int main() {
 
 			h_n = convert_struct_byte_order(h_h, htons);
 			memcpy(response, &h_n, sizeof(header_struct));
-		}
 
-		print_message("response after adding header section", response, responseSize);
+			print_message("response after adding header section", response, responseSize);
+		}
 
 		char questions[512];
 		memcpy(&questions, request + 12, sizeof(request) - 12);
@@ -554,14 +554,15 @@ int main() {
 		responseSize += header_size_increase;
 
 		if (question_section_enabled) {
+			h_h.qdcount = 0;
 			for (std::vector<char> question_char_vec : questions_list) {
 				std::string question(question_char_vec.begin(), question_char_vec.end());
 				print_hex("adding question", (void *)question.c_str(), question.length());
 				add_question_section(question.c_str(), h_h, response, responseSize, questionLength, h_n);
 			}
-		}
 
-		print_message("response after adding question section", response, responseSize);
+			print_message("response after adding question section", response, responseSize);
+		}
 
 		if (answer_section_enabled) {
 			for (std::vector<char> question_char_vec : questions_list) {
@@ -569,11 +570,9 @@ int main() {
 				print_hex("adding answer to question", (void *)question.c_str(), question.length());
 				add_answer_section(question, h_h, response, responseSize, questionLength, answerLength, h_n);
 			}
+
+			print_message("response after adding answer section", response, responseSize);
 		}
-
-		print_message("response after adding answer section", response, responseSize);
-
-		responseSize += 1;
 
 		// Send response
 		if (sendto(udpSocket, &response, responseSize, 0, reinterpret_cast<struct sockaddr *>(&clientAddress), sizeof(clientAddress)) == -1) {
