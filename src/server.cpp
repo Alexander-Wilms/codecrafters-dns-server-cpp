@@ -242,13 +242,13 @@ void add_question_section(const char *question, header_struct &h_h, char *respon
 	// ;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 48552
 	// ;; flags: qr; QUERY: 1, ANSWER: 0, AUTHORITY: 0, ADDITIONAL: 0
 	// ;; WARNING: Message has 3 extra bytes at end
-	memcpy(response + sizeof(header_struct), q.name, strlen(q.name) + 1);
-	memcpy(response + sizeof(header_struct) + strlen(q.name) + 1, &q.type, sizeof(q.type));
-	memcpy(response + sizeof(header_struct) + strlen(q.name) + 1 + 2, &q._class, sizeof(q._class));
+	memcpy(response + sizeof(header_struct) + questionLength, q.name, strlen(q.name) + 1);
+	memcpy(response + sizeof(header_struct) + questionLength + strlen(q.name) + 1, &q.type, sizeof(q.type));
+	memcpy(response + sizeof(header_struct) + questionLength + strlen(q.name) + 1 + 2, &q._class, sizeof(q._class));
 
-	questionLength = strlen(q.name) + 1 + sizeof(q.type) + sizeof(q._class);
+	questionLength += strlen(q.name) + 1 + sizeof(q.type) + sizeof(q._class);
 	responseSize += questionLength;
-	print_hex("question", response + sizeof(header_struct), questionLength);
+	print_hex("question", response + sizeof(header_struct) + questionLength, questionLength);
 }
 
 void print_map(const std::map<int, std::string> &map) {
