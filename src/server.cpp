@@ -196,7 +196,7 @@ void print_message(std::string name, char *request, int bytesRead) {
 	std::printf("\n↑\n");
 }
 
-void add_question_section(const char *question, header_struct &h_h, char *response, int &responseSize, int &questionLength) {
+void add_question_section(const char *question, header_struct &h_h, char *response, int &responseSize, int &questionLength, header_struct &h_n) {
 	// putting the hex code in the string without additional quotes results in this warning and results in the wrong value being stored:
 	// warning: hex escape sequence out of range
 	// Cf. https://www.unix.com/programming/149172-how-use-hex-escape-char-string-c.html
@@ -233,8 +233,11 @@ void add_question_section(const char *question, header_struct &h_h, char *respon
 	print_hex("q.type", &q.type, 2);
 	print_hex("q._class", &q._class, 2);
 
-	h_h.qdcount = 1;
+	h_h.qdcount += 1;
 	print_header_struct(h_h);
+	// header was updated and needs to copied into the response again
+	h_n = convert_struct_byte_order(h_h, htons);
+	memcpy(response, &h_n, sizeof(header_struct));
 
 	// add 1 for the null terminator to fix this error
 	// ;; Warning: Message parser reports malformed message packet.
@@ -546,7 +549,7 @@ int main() {
 			for (std::vector<char> question_char_vec : questions_list) {
 				std::string question(question_char_vec.begin(), question_char_vec.end());
 				print_hex("adding question", (void *)question.c_str(), question.length());
-				add_question_section(question.c_str(), h_h, response, responseSize, questionLength);
+				add_question_section(question.c_str(), h_h, response, responseSize, questionLength, h_n);
 			}
 		}
 
