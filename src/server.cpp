@@ -329,6 +329,18 @@ std:
 				offset |= (uint16_t)second_offset_byte;		  // Perform a bitwise OR with second_offset_byte
 
 				printf("the pointer has an offset of %d bytes from the start of the entire message\n", offset);
+
+				// Print all entries in the map
+				printf("found these labels so far:");
+				for (const auto &entry : found_labels) {
+					std::cout << entry.first << ": " << entry.second << std::endl;
+				}
+
+				if (found_labels.find(offset) != found_labels.end()) {
+					printf("found referenced label\n");
+				} else {
+					printf("didn't find referenced label\n");
+				}
 			}
 		} else {
 			printf("octet is 0x00, end of names reached\n");
