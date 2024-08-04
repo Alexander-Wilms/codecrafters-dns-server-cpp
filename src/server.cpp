@@ -386,7 +386,7 @@ std::vector<std::vector<char>> extract_questions(char *questions, int questions_
 					// p1 p2 x0 type  class
 					q_byte_idx += 6;
 				} else {
-					printf("didn't find referenced label\n");
+					printf("didn't find referenced label at offset %d\n", offset);
 				}
 			}
 		} else {
