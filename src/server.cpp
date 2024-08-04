@@ -251,6 +251,13 @@ void add_question_section(const char *question, header_struct &h_h, char *respon
 	print_hex("question", response + sizeof(header_struct), questionLength);
 }
 
+void print_map(const std::map<int, std::string> &map) {
+	printf("compression dict:\n");
+	for (auto &entry : map) {
+		std::cout << entry.first << ": " << entry.second << ", len " << entry.second.length() << std::endl;
+	}
+}
+
 std::map<int, std::string> found_labels_to_compression_dict(const std::map<int, std::string> &found_labels) {
 
 	std::map<int, std::string> compression_dict = found_labels;
@@ -260,20 +267,19 @@ std::map<int, std::string> found_labels_to_compression_dict(const std::map<int, 
 		std::cout << entry.first << ": " << entry.second << ", len " << entry.second.length() << std::endl;
 		compression_entry_complete = false;
 		while (!compression_entry_complete) {
-			int next_label_idx = entry.first + entry.second.length() + 1;
+			printf("checking if label at index %d can be expanded further\n", entry.first);
+			int next_label_idx = entry.first + compression_dict[entry.first].length();
 			if (compression_dict.find(next_label_idx) != compression_dict.end()) {
+				printf("yes\n");
 				// https://www.geeksforgeeks.org/how-to-convert-a-single-character-to-string-in-cpp/
 
 				compression_dict.insert({entry.first, entry.second + std::string(1, (char)(next_label_idx)) + compression_dict[next_label_idx]});
 			} else {
+				printf("no\n");
 				compression_entry_complete = true;
 			}
+			print_map(compression_dict);
 		}
-	}
-
-	printf("compression dict:\n");
-	for (auto &entry : compression_dict) {
-		std::cout << entry.first << ": " << entry.second << ", len " << entry.second.length() << std::endl;
 	}
 
 	return compression_dict;
