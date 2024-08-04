@@ -260,7 +260,7 @@ std::map<int, std::string> found_labels_to_compression_dict(const std::map<int, 
 		std::cout << entry.first << ": " << entry.second << ", len " << entry.second.length() << std::endl;
 		compression_entry_complete = false;
 		while (!compression_entry_complete) {
-			int next_label_idx = entry.first + entry.second.length();
+			int next_label_idx = entry.first + entry.second.length() + 1;
 			if (compression_dict.find(next_label_idx) != compression_dict.end()) {
 				// https://www.geeksforgeeks.org/how-to-convert-a-single-character-to-string-in-cpp/
 
