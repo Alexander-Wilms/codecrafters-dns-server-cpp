@@ -467,12 +467,6 @@ int set_up_connection(const udp_connection_type &udp_connection_type, int &udpSo
 		// $ dig 1.1.1.1 -p 53 +noedns google.com
 		address.sin_port = htons(53);
 
-		// connect to server
-		// if (connect(udpSocket, reinterpret_cast<struct sockaddr *>(&address), sizeof(address)) < 0) {
-		//	printf("\n Error : Connect Failed \n");
-		//	return 1;
-		//}
-
 		printf("Connected to resolving DNS server at %s\n", resolver_dns_ip);
 
 		break;
