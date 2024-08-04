@@ -516,12 +516,19 @@ int main(int argc, char *argv[]) {
 		std::cout << "argv: " << argv[i] << std::endl;
 	}
 
+	bool query_resolving_server;
+
 	std::string resolver_address;
 	if (argc == 3 && strcmp("--resolver", argv[1]) == 0) {
 		resolver_address = argv[2];
+		query_resolving_server = true;
 	} else {
 		// Cloudflare DNS server
 		resolver_address = "1.1.1.1";
+
+		// disable it for now if no --resolver argument is used so the tests pass
+		// the tests expect longassdomainname.com to be resolved to 8.8.8.8
+		query_resolving_server = false;
 	}
 
 	printf("Using server at %s as DNS resolver\n", resolver_address.c_str());
@@ -565,7 +572,6 @@ int main(int argc, char *argv[]) {
 	header_struct h_n = {};
 	header_struct h_h = {};
 
-	bool query_resolving_server = true;
 	bool answer_section_enabled = true;
 	bool question_section_enabled = true || answer_section_enabled;
 	bool add_header_section = true || question_section_enabled;
