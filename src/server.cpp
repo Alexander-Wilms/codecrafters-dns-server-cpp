@@ -540,8 +540,10 @@ int main(int argc, char *argv[]) {
 	}
 
 	int bytesRead;
-	char request[512];
-	char response[512];
+	char requestFromClient[512];
+	char responseToClient[512];
+
+	char responseFromResolvingDNS[512];
 
 	header_struct h_n = {};
 	header_struct h_h = {};
@@ -557,33 +559,40 @@ int main(int argc, char *argv[]) {
 		std::printf("↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓\n");
 
 		// Receive data
-		bytesRead = recvfrom(clientUdpSocket, request, sizeof(request), 0, reinterpret_cast<struct sockaddr *>(&clientAddress), &clientAddrLen);
+		bytesRead = recvfrom(clientUdpSocket, requestFromClient, sizeof(requestFromClient), 0, reinterpret_cast<struct sockaddr *>(&clientAddress), &clientAddrLen);
 		if (bytesRead == -1) {
 			perror("Error receiving data");
 			break;
 		}
 
-		request[bytesRead] = '\0';
+		requestFromClient[bytesRead] = '\0';
 		std::cout << "Received UDP packet with " << bytesRead << " bytes" << std::endl;
 
-		print_message("request", request, bytesRead);
+		print_message("request", requestFromClient, bytesRead);
+
+		int bytesReadFromResolvingDNS;
 
 		if (query_resolving_server) {
 			printf("Forwarding received UDP packet to resolving DNS server\n");
 
-			if (sendto(resolverUdpSocket, &request, sizeof(request), 0, reinterpret_cast<struct sockaddr *>(&resolverAddress), sizeof(resolverAddress)) == -1) {
+			if (sendto(resolverUdpSocket, &requestFromClient, sizeof(requestFromClient), 0, reinterpret_cast<struct sockaddr *>(&resolverAddress), sizeof(resolverAddress)) == -1) {
 				perror("Failed to forward UDP packet to resolver DNS server");
 			}
+
+			bytesReadFromResolvingDNS = recvfrom(resolverUdpSocket, responseFromResolvingDNS, sizeof(responseFromResolvingDNS), 0, reinterpret_cast<struct sockaddr *>(&resolverAddress), &resolverAddrLen);
+			std::cout << "Received UDP packet with " << bytesRead << " bytes from resolving DNS server" << std::endl;
+
+			print_message("response from resolving DNS server", responseFromResolvingDNS, bytesReadFromResolvingDNS);
 		}
 
 		// Copy request to create response
-		memcpy(response, request, bytesRead);
+		memcpy(responseToClient, requestFromClient, bytesRead);
 
 		int questionLength = 0;
 		int answerLength = 0;
 
 		if (add_header_section) {
-			memcpy(&h_n, request, sizeof(header_struct));
+			memcpy(&h_n, requestFromClient, sizeof(header_struct));
 
 			h_h = convert_struct_byte_order(h_n, ntohs);
 
@@ -604,19 +613,19 @@ int main(int argc, char *argv[]) {
 #endif
 
 			h_n = convert_struct_byte_order(h_h, htons);
-			memcpy(response, &h_n, sizeof(header_struct));
+			memcpy(responseToClient, &h_n, sizeof(header_struct));
 
-			print_message("response after adding header section", response, responseSize);
+			print_message("response after adding header section", responseToClient, responseSize);
 		}
 
 		char questions[512];
-		memcpy(&questions, request + 12, sizeof(request) - 12);
+		memcpy(&questions, requestFromClient + 12, sizeof(requestFromClient) - 12);
 
-		print_hex("questions", questions, sizeof(request) - 12);
+		print_hex("questions", questions, sizeof(requestFromClient) - 12);
 
 		printf("request contains the following questions:\n");
 		int header_size_increase = 0;
-		std::vector<std::vector<char>> questions_list = extract_questions(questions, sizeof(request) - 12, header_size_increase);
+		std::vector<std::vector<char>> questions_list = extract_questions(questions, sizeof(requestFromClient) - 12, header_size_increase);
 		responseSize += header_size_increase;
 
 		h_h.setRecursionAvailable(true);
@@ -626,24 +635,24 @@ int main(int argc, char *argv[]) {
 			for (std::vector<char> question_char_vec : questions_list) {
 				std::string question(question_char_vec.begin(), question_char_vec.end());
 				print_hex("adding question", (void *)question.c_str(), question.length());
-				add_question_section(question.c_str(), h_h, response, responseSize, questionLength, h_n);
+				add_question_section(question.c_str(), h_h, responseToClient, responseSize, questionLength, h_n);
 			}
 
-			print_message("response after adding question section", response, responseSize);
+			print_message("response after adding question section", responseToClient, responseSize);
 		}
 
 		if (answer_section_enabled) {
 			for (std::vector<char> question_char_vec : questions_list) {
 				std::string question(question_char_vec.begin(), question_char_vec.end());
 				print_hex("adding answer to question", (void *)question.c_str(), question.length());
-				add_answer_section(question, h_h, response, responseSize, questionLength, answerLength, h_n);
+				add_answer_section(question, h_h, responseToClient, responseSize, questionLength, answerLength, h_n);
 			}
 
-			print_message("response after adding answer section", response, responseSize);
+			print_message("response after adding answer section", responseToClient, responseSize);
 		}
 
 		// Send response
-		if (sendto(clientUdpSocket, &response, responseSize, 0, reinterpret_cast<struct sockaddr *>(&clientAddress), sizeof(clientAddress)) == -1) {
+		if (sendto(clientUdpSocket, &responseToClient, responseSize, 0, reinterpret_cast<struct sockaddr *>(&clientAddress), sizeof(clientAddress)) == -1) {
 			perror("Failed to send response");
 		}
 
