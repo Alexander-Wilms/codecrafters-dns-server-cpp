@@ -253,7 +253,6 @@ void add_question_section(const char *question, header_struct &h_h, char *respon
 std::vector<std::vector<char>> extract_questions(char *questions, int questions_buffer_size) {
 	printf("extract_questions()\n");
 	std::vector<std::vector<char>> questions_list;
-	char extracted_name[512];
 	std::string name_so_far = "";
 	char current_label[512];
 	int name_idx_offset = 0;
@@ -310,7 +309,6 @@ std:
 
 				name_so_far += std::string(current_label);
 
-				memcpy(extracted_name + name_idx_offset, &questions[q_byte_idx] + name_idx_offset, 1 + label_length); // add one for the lengt octet
 				name_idx_offset += 1 + label_length;
 				q_byte_idx += label_length;
 
