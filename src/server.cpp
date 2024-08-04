@@ -263,6 +263,7 @@ std::map<int, std::string> found_labels_to_compression_dict(const std::map<int, 
 	std::map<int, std::string> compression_dict = found_labels;
 
 	print_map(compression_dict);
+	printf("exapnding entries\n");
 
 	bool compression_entry_complete = false;
 	for (auto &entry : compression_dict) {
@@ -275,7 +276,7 @@ std::map<int, std::string> found_labels_to_compression_dict(const std::map<int, 
 				printf("yes\n");
 				// https://www.geeksforgeeks.org/how-to-convert-a-single-character-to-string-in-cpp/
 
-				compression_dict[entry.first] = entry.second + std::string(1, (char)(next_label_idx)) + compression_dict[next_label_idx];
+				compression_dict[entry.first] = entry.second + compression_dict[next_label_idx];
 			} else {
 				printf("no\n");
 				compression_entry_complete = true;
