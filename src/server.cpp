@@ -325,13 +325,14 @@ std:
 
 				uint16_t offset = 0;
 
-				offset |= ((uint16_t)first_offset_byte) << 8; // Shift first_offset_byte to the left by 8 bits
-				offset |= (uint16_t)second_offset_byte;		  // Perform a bitwise OR with second_offset_byte
+				// big endian network byte order
+				offset |= ((uint16_t)second_offset_byte) << 8; // Shift first_offset_byte to the left by 8 bits
+				offset |= (uint16_t)first_offset_byte;		   // Perform a bitwise OR with second_offset_byte
 
 				printf("the pointer has an offset of %d bytes from the start of the entire message\n", offset);
 
 				// Print all entries in the map
-				printf("found these labels so far:");
+				printf("found these labels so far:\n");
 				for (const auto &entry : found_labels) {
 					std::cout << entry.first << ": " << entry.second << std::endl;
 				}
