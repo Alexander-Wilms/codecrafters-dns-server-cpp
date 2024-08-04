@@ -251,6 +251,34 @@ void add_question_section(const char *question, header_struct &h_h, char *respon
 	print_hex("question", response + sizeof(header_struct), questionLength);
 }
 
+std::map<int, std::string> found_labels_to_compression_dict(const std::map<int, std::string> &found_labels) {
+
+	std::map<int, std::string> compression_dict = found_labels;
+
+	bool compression_entry_complete = false;
+	for (auto &entry : compression_dict) {
+		std::cout << entry.first << ": " << entry.second << ", len " << entry.second.length() << std::endl;
+		compression_entry_complete = false;
+		while (!compression_entry_complete) {
+			int next_label_idx = entry.first + entry.second.length() + 1;
+			if (compression_dict.find(next_label_idx) != compression_dict.end()) {
+				// https://www.geeksforgeeks.org/how-to-convert-a-single-character-to-string-in-cpp/
+
+				compression_dict.insert({entry.first, entry.second + std::string(1, (char)(next_label_idx)) + compression_dict[next_label_idx]});
+			} else {
+				compression_entry_complete = true;
+			}
+		}
+	}
+
+	printf("compression dict:\n");
+	for (auto &entry : compression_dict) {
+		std::cout << entry.first << ": " << entry.second << ", len " << entry.second.length() << std::endl;
+	}
+
+	return compression_dict;
+}
+
 std::vector<std::vector<char>> extract_questions(char *questions, int questions_buffer_size) {
 	printf("extract_questions()\n");
 	std::vector<std::vector<char>> questions_list;
@@ -266,6 +294,7 @@ std::vector<std::vector<char>> extract_questions(char *questions, int questions_
 	enum_name_label_or_pointer name_label_or_pointer;
 	// map is used to access previous labels referenced by pointers used for compression
 	std::map<int, std::string> found_labels;
+	std::map<int, std::string> compression_dict;
 
 	for (int q_byte_idx = 0; q_byte_idx < questions_buffer_size; q_byte_idx++) {
 		octet = questions[q_byte_idx];
@@ -328,6 +357,8 @@ std::vector<std::vector<char>> extract_questions(char *questions, int questions_
 				offset |= (uint16_t)second_offset_byte;		  // Perform a bitwise OR with second_offset_byte
 
 				printf("the pointer has an offset of %d bytes from the start of the entire message\n", offset);
+
+				compression_dict = found_labels_to_compression_dict(found_labels);
 
 				// Print all entries in the map
 				printf("found these labels so far:\n");
