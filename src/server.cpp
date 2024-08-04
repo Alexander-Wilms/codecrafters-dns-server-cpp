@@ -206,8 +206,6 @@ void add_question_section(const char *question, header_struct &h_h, char *respon
 	// warning: hex escape sequence out of range
 	// Cf. https://www.unix.com/programming/149172-how-use-hex-escape-char-string-c.html
 
-	question_struct request_question;
-
 	question_struct q = {};
 	strcpy(q.name, question);
 
@@ -303,9 +301,7 @@ std::vector<std::vector<char>> extract_questions(char *questions, int questions_
 	std::string name_so_far = "";
 	char current_label[512];
 	int label_length = 0;
-	bool done_extracting_names = false;
 	uint8_t octet;
-	int name_length = 0;
 	enum enum_name_label_or_pointer { label,
 									  pointer };
 	bool currently_constructing_name_from_labels = true;
@@ -445,8 +441,6 @@ void add_answer_section(std::string question, header_struct &h_h, char *response
 }
 
 int set_up_connection(const udp_connection_type &udp_connection_type, int &udpSocket, struct sockaddr_in &address, int PORT) {
-	int unused;
-
 	udpSocket = socket(AF_INET, SOCK_DGRAM, 0);
 	if (udpSocket == -1) {
 		std::cerr << "Socket creation failed: " << strerror(errno) << "..." << std::endl;
@@ -568,9 +562,6 @@ int main(int argc, char *argv[]) {
 			perror("Error receiving data");
 			break;
 		}
-
-		uint16_t source_port = ntohs(reinterpret_cast<struct sockaddr_in *>(&clientAddress)->sin_port);
-		uint16_t destination_port = htons(2053);
 
 		request[bytesRead] = '\0';
 		std::cout << "Received UDP packet with " << bytesRead << " bytes" << std::endl;
