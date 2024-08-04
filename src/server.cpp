@@ -6,6 +6,7 @@
 #include <iostream>
 #include <map>
 #include <netinet/in.h>
+#include <sstream>
 #include <stdio.h>
 #include <string>
 #include <strings.h>
@@ -440,7 +441,7 @@ void add_answer_section(std::string question, header_struct &h_h, char *response
 	memcpy(response, &h_n, sizeof(header_struct));
 }
 
-int set_up_connection(const udp_connection_type &udp_connection_type, int &udpSocket, struct sockaddr_in &address, int PORT) {
+int setup_socket(int &udpSocket) {
 	udpSocket = socket(AF_INET, SOCK_DGRAM, 0);
 	if (udpSocket == -1) {
 		std::cerr << "Socket creation failed: " << strerror(errno) << "..." << std::endl;
@@ -454,36 +455,58 @@ int set_up_connection(const udp_connection_type &udp_connection_type, int &udpSo
 		return 1;
 	}
 
+	return 0;
+}
+
+int set_up_connection_as_client(const udp_connection_type &udp_connection_type, int &udpSocket, struct sockaddr_in &address, const int &PORT, const std::string &resolver_address) {
+	if (setup_socket(udpSocket)) {
+		return 1;
+	}
+
 	address.sin_family = AF_INET;
 
-	char resolver_dns_ip[] = "1.1.1.1";
-	// https://www.geeksforgeeks.org/udp-client-server-using-connect-c-implementation/
-	switch (udp_connection_type) {
-	case udp_connection_type_enum::client:
+	std::string resolver_ip = "";
+	std::string s_resolver_port = "";
+	// 53 is the standard port for DNS
+	// can be tested with this command:
+	// $ dig 1.1.1.1 -p 53 +noedns google.com
+	int resolver_port = 53;
 
-		address.sin_addr.s_addr = inet_addr(resolver_dns_ip);
-		// 53 is the standard port for DNS
-		// can be tested with this command:
-		// $ dig 1.1.1.1 -p 53 +noedns google.com
-		address.sin_port = htons(53);
+	std::stringstream ss(resolver_address);
+	std::getline(ss, resolver_ip, ':');
 
-		printf("Connected to resolving DNS server at %s\n", resolver_dns_ip);
-
-		break;
-
-	case udp_connection_type_enum::server:
-		address.sin_addr = {htonl(INADDR_ANY)};
-		address.sin_port = htons(PORT);
-
-		if (
-			bind(udpSocket, reinterpret_cast<struct sockaddr *>(&address), sizeof(address)) != 0) {
-			std::cerr << "Bind failed: " << strerror(errno) << std::endl;
-			return 1;
-		}
-
-		std::cout << "Bound port: " << ntohs(address.sin_port) << std::endl;
-		break;
+	if (ss.good()) {
+		std::getline(ss, s_resolver_port);
+		resolver_port = std::stoi(s_resolver_port);
 	}
+
+	// https://www.geeksforgeeks.org/udp-client-server-using-connect-c-implementation/
+	address.sin_addr.s_addr = inet_addr(resolver_ip.c_str());
+
+	address.sin_port = htons(resolver_port);
+
+	printf("Connected to resolving DNS server at %s\n", resolver_address.c_str());
+
+	return 0;
+}
+
+int set_up_connection_as_server(const udp_connection_type &udp_connection_type, int &udpSocket, struct sockaddr_in &address, int PORT) {
+	if (setup_socket(udpSocket)) {
+		return 1;
+	}
+
+	address.sin_family = AF_INET;
+
+	address.sin_addr = {htonl(INADDR_ANY)};
+	address.sin_port = htons(PORT);
+
+	if (
+		bind(udpSocket, reinterpret_cast<struct sockaddr *>(&address), sizeof(address)) != 0) {
+		std::cerr << "Bind failed: " << strerror(errno) << std::endl;
+		return 1;
+	}
+
+	std::cout << "Bound port: " << ntohs(address.sin_port) << std::endl;
 
 	return 0;
 }
@@ -520,7 +543,7 @@ int main(int argc, char *argv[]) {
 	int clientUdpSocket;
 	struct sockaddr_in clientAddress;
 	socklen_t clientAddrLen = sizeof(clientAddress);
-	if (set_up_connection(udp_connection_type::server, clientUdpSocket, clientAddress, 2053)) {
+	if (set_up_connection_as_server(udp_connection_type::server, clientUdpSocket, clientAddress, 2053)) {
 		return 1;
 	}
 
@@ -529,7 +552,7 @@ int main(int argc, char *argv[]) {
 	int resolverUdpSocket;
 	struct sockaddr_in resolverAddress;
 	socklen_t resolverAddrLen = sizeof(resolverAddress);
-	if (set_up_connection(udp_connection_type::client, resolverUdpSocket, resolverAddress, 2054)) {
+	if (set_up_connection_as_client(udp_connection_type::client, resolverUdpSocket, resolverAddress, 2054, resolver_address)) {
 		return 1;
 	}
 
