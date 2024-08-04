@@ -11,8 +11,6 @@
 #include <unordered_map>
 #include <vector>
 
-#define PORT 2053
-
 // https://en.cppreference.com/w/cpp/language/bit_field
 struct __attribute__((packed)) header_struct {
 	uint16_t id;
@@ -439,34 +437,7 @@ void add_answer_section(std::string question, header_struct &h_h, char *response
 	memcpy(response, &h_n, sizeof(header_struct));
 }
 
-int main(int argc, char *argv[]) {
-	for (int i = 0; i < argc; i++) {
-		std::cout << "argv: " << argv[i] << std::endl;
-	}
-
-	std::string resolver_address;
-	if (argc == 3 && strcmp("--resolver", argv[1]) == 0) {
-		resolver_address = argv[2];
-	} else {
-		// Cloudflare DNS server
-		resolver_address = "1.1.1.1";
-	}
-
-	printf("Using server at %s as DNS resolver\n", resolver_address.c_str());
-
-	// Flush after every std::cout / std::cerr
-	std::cout << std::unitbuf;
-	std::cerr << std::unitbuf;
-
-	// Disable output buffering
-	setbuf(stdout, nullptr);
-
-	// You can use print statements as follows for debugging, they'll be visible when running tests.
-	std::cout << "Logs from your program will appear here!" << std::endl;
-
-	int udpSocket;
-	struct sockaddr_in clientAddress;
-
+int set_up_connection(int &udpSocket, struct sockaddr_in &clientAddress, int PORT) {
 	udpSocket = socket(AF_INET, SOCK_DGRAM, 0);
 	if (udpSocket == -1) {
 		std::cerr << "Socket creation failed: " << strerror(errno) << "..." << std::endl;
@@ -493,10 +464,53 @@ int main(int argc, char *argv[]) {
 
 	std::cout << "Bound port: " << ntohs(serv_addr.sin_port) << std::endl;
 
+	return 0;
+}
+
+int main(int argc, char *argv[]) {
+	for (int i = 0; i < argc; i++) {
+		std::cout << "argv: " << argv[i] << std::endl;
+	}
+
+	std::string resolver_address;
+	if (argc == 3 && strcmp("--resolver", argv[1]) == 0) {
+		resolver_address = argv[2];
+	} else {
+		// Cloudflare DNS server
+		resolver_address = "1.1.1.1";
+	}
+
+	printf("Using server at %s as DNS resolver\n", resolver_address.c_str());
+
+	// Flush after every std::cout / std::cerr
+	std::cout << std::unitbuf;
+	std::cerr << std::unitbuf;
+
+	// Disable output buffering
+	setbuf(stdout, nullptr);
+
+	// You can use print statements as follows for debugging, they'll be visible when running tests.
+	std::cout << "Logs from your program will appear here!" << std::endl;
+
+	int clientUdpSocket;
+	struct sockaddr_in clientAddress;
+	socklen_t clientAddrLen = sizeof(clientAddress);
+	if (set_up_connection(clientUdpSocket, clientAddress, 2053)) {
+		return 1;
+	}
+
+	// One cannot call bind() again on a socket that is already bound. Once a socket is bound, its binding cannot be changed.
+	// https://stackoverflow.com/a/43332930/2278742
+	int resolverUdpSocket;
+	struct sockaddr_in resolverAddress;
+	socklen_t resolverAddrLen = sizeof(resolverAddress);
+	if (set_up_connection(resolverUdpSocket, resolverAddress, 2054)) {
+		return 1;
+	}
+
 	int bytesRead;
 	char request[512];
 	char response[512];
-	socklen_t clientAddrLen = sizeof(clientAddress);
 
 	header_struct h_n = {};
 	header_struct h_h = {};
@@ -506,7 +520,7 @@ int main(int argc, char *argv[]) {
 		std::printf("↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓\n");
 
 		// Receive data
-		bytesRead = recvfrom(udpSocket, request, sizeof(request), 0, reinterpret_cast<struct sockaddr *>(&clientAddress), &clientAddrLen);
+		bytesRead = recvfrom(clientUdpSocket, request, sizeof(request), 0, reinterpret_cast<struct sockaddr *>(&clientAddress), &clientAddrLen);
 		if (bytesRead == -1) {
 			perror("Error receiving data");
 			break;
@@ -591,14 +605,14 @@ int main(int argc, char *argv[]) {
 		}
 
 		// Send response
-		if (sendto(udpSocket, &response, responseSize, 0, reinterpret_cast<struct sockaddr *>(&clientAddress), sizeof(clientAddress)) == -1) {
+		if (sendto(clientUdpSocket, &response, responseSize, 0, reinterpret_cast<struct sockaddr *>(&clientAddress), sizeof(clientAddress)) == -1) {
 			perror("Failed to send response");
 		}
 
 		std::printf("↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑\n");
 	}
 
-	close(udpSocket);
+	close(clientUdpSocket);
 
 	return 0;
 }
