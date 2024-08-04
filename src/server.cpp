@@ -371,12 +371,13 @@ std::vector<std::vector<char>> extract_questions(char *questions, int questions_
 
 				// Print all entries in the map
 				printf("found these labels so far:\n");
-				for (const auto &entry : found_labels) {
-					std::cout << entry.first << ": " << entry.second << std::endl;
-				}
+				print_map(found_labels);
 
-				if (found_labels.find(offset) != found_labels.end()) {
-					std::string found_label = found_labels[offset];
+				printf("resulting in this dict:\n");
+				print_map(compression_dict);
+
+				if (compression_dict.find(offset) != compression_dict.end()) {
+					std::string found_label = compression_dict[offset];
 					printf("found referenced label: %s\n", found_label.c_str());
 					name_so_far += questions[offset - 12]; // append the label length
 					name_so_far += found_label;
