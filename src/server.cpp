@@ -249,8 +249,9 @@ void add_question_section(const char *question, header_struct &h_h, char *respon
 	memcpy(response + sizeof(header_struct) + questionLength + strlen(q.name) + 1, &q.type, sizeof(q.type));
 	memcpy(response + sizeof(header_struct) + questionLength + strlen(q.name) + 1 + 2, &q._class, sizeof(q._class));
 
-	questionLength += strlen(q.name) + 1 + sizeof(q.type) + sizeof(q._class);
-	responseSize += questionLength;
+	int additionalQuestionLength = strlen(q.name) + 1 + sizeof(q.type) + sizeof(q._class);
+	questionLength += additionalQuestionLength;
+	responseSize += additionalQuestionLength;
 	print_hex("question", response + sizeof(header_struct) + questionLength, questionLength);
 }
 
@@ -291,7 +292,7 @@ std::map<int, std::string> found_labels_to_compression_dict(const std::map<int, 
 	return compression_dict;
 }
 
-std::vector<std::vector<char>> extract_questions(char *questions, int questions_buffer_size) {
+std::vector<std::vector<char>> extract_questions(char *questions, int questions_buffer_size, int &header_size_increase) {
 	printf("extract_questions()\n");
 	std::vector<std::vector<char>> questions_list;
 	std::string name_so_far = "";
@@ -389,6 +390,8 @@ std::vector<std::vector<char>> extract_questions(char *questions, int questions_
 					// c0 10 00 01 00 01 00
 					// p1 p2 x0 type  class
 					q_byte_idx += 6;
+
+					header_size_increase += found_label.length() - 2; // -2 for te pointer that's being replaced
 				} else {
 					printf("didn't find referenced label at offset %d\n", offset);
 				}
@@ -402,7 +405,7 @@ std::vector<std::vector<char>> extract_questions(char *questions, int questions_
 	return questions_list;
 }
 
-void add_answer_section(std::string question, header_struct &h_h, char *response, int &responseSize, int &questionLength, header_struct &h_n) {
+void add_answer_section(std::string question, header_struct &h_h, char *response, int &responseSize, int &questionLength, int &answerLength, header_struct &h_n) {
 	answer_struct a = {};
 	strncpy(a.name, question.c_str(),
 			512);
@@ -418,16 +421,17 @@ void add_answer_section(std::string question, header_struct &h_h, char *response
 
 	printf("name in answer: %s\n", a.name);
 
-	int answerLength = strlen(a.name) + 1 + sizeof(a.type) + sizeof(a._class) + sizeof(a.ttl) + sizeof(a.length) + 4;
-	responseSize += answerLength;
-
 	// this is necessary since the name car array is bigger tan te actual string
-	memcpy(response + sizeof(header_struct) + questionLength, a.name, strlen(a.name) + 1);
-	memcpy(response + sizeof(header_struct) + questionLength + strlen(a.name) + 1, &a.type, sizeof(a.type));
-	memcpy(response + sizeof(header_struct) + questionLength + strlen(a.name) + 1 + sizeof(a.type), &a._class, sizeof(a._class));
-	memcpy(response + sizeof(header_struct) + questionLength + strlen(a.name) + 1 + sizeof(a.type) + sizeof(a._class), &a.ttl, sizeof(a.ttl));
-	memcpy(response + sizeof(header_struct) + questionLength + strlen(a.name) + 1 + sizeof(a.type) + sizeof(a._class) + sizeof(a.ttl), &a.length, sizeof(a.length));
-	memcpy(response + sizeof(header_struct) + questionLength + strlen(a.name) + 1 + sizeof(a.type) + sizeof(a._class) + sizeof(a.ttl) + sizeof(a.length), &a.data, 4);
+	memcpy(response + sizeof(header_struct) + questionLength + answerLength, a.name, strlen(a.name) + 1);
+	memcpy(response + sizeof(header_struct) + questionLength + answerLength + strlen(a.name) + 1, &a.type, sizeof(a.type));
+	memcpy(response + sizeof(header_struct) + questionLength + answerLength + strlen(a.name) + 1 + sizeof(a.type), &a._class, sizeof(a._class));
+	memcpy(response + sizeof(header_struct) + questionLength + answerLength + strlen(a.name) + 1 + sizeof(a.type) + sizeof(a._class), &a.ttl, sizeof(a.ttl));
+	memcpy(response + sizeof(header_struct) + questionLength + answerLength + strlen(a.name) + 1 + sizeof(a.type) + sizeof(a._class) + sizeof(a.ttl), &a.length, sizeof(a.length));
+	memcpy(response + sizeof(header_struct) + questionLength + answerLength + strlen(a.name) + 1 + sizeof(a.type) + sizeof(a._class) + sizeof(a.ttl) + sizeof(a.length), &a.data, 4);
+
+	int additionalAnswerLength = strlen(a.name) + 1 + sizeof(a.type) + sizeof(a._class) + sizeof(a.ttl) + sizeof(a.length) + 4;
+	answerLength += additionalAnswerLength;
+	responseSize += additionalAnswerLength;
 
 	h_h.ancount += 1;
 	// header was updated and needs to copied into the response again
@@ -506,6 +510,7 @@ int main() {
 		memcpy(response, request, bytesRead);
 
 		int questionLength = 0;
+		int answerLength = 0;
 
 		bool answer_section_enabled = true;
 		bool question_section_enabled = true || answer_section_enabled;
@@ -544,7 +549,10 @@ int main() {
 		print_hex("questions", questions, sizeof(request) - 12);
 
 		printf("request contains the following questions:\n");
-		std::vector<std::vector<char>> questions_list = extract_questions(questions, sizeof(request) - 12);
+		int header_size_increase = 0;
+		std::vector<std::vector<char>> questions_list = extract_questions(questions, sizeof(request) - 12, header_size_increase);
+		responseSize += header_size_increase;
+
 		if (question_section_enabled) {
 			for (std::vector<char> question_char_vec : questions_list) {
 				std::string question(question_char_vec.begin(), question_char_vec.end());
@@ -559,11 +567,13 @@ int main() {
 			for (std::vector<char> question_char_vec : questions_list) {
 				std::string question(question_char_vec.begin(), question_char_vec.end());
 				print_hex("adding answer to question", (void *)question.c_str(), question.length());
-				add_answer_section(question, h_h, response, responseSize, questionLength, h_n);
+				add_answer_section(question, h_h, response, responseSize, questionLength, answerLength, h_n);
 			}
 		}
 
 		print_message("response after adding answer section", response, responseSize);
+
+		responseSize += 1;
 
 		// Send response
 		if (sendto(udpSocket, &response, responseSize, 0, reinterpret_cast<struct sockaddr *>(&clientAddress), sizeof(clientAddress)) == -1) {
