@@ -436,8 +436,10 @@ void add_answer_section(std::string question, header_struct &h_h, char *response
 	responseSize += additionalAnswerLength;
 
 	h_h.ancount += 1;
+
 	// header was updated and needs to copied into the response again
 	h_n = convert_struct_byte_order(h_h, htons);
+	print_header_struct(h_n);
 	memcpy(response, &h_n, sizeof(header_struct));
 }
 
