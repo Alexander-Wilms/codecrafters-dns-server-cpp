@@ -428,7 +428,6 @@ void add_answer_section(std::string question, header_struct &h_h, char *response
 
 	h_h.ancount += 1;
 	// header was updated and needs to copied into the response again
-
 	h_n = convert_struct_byte_order(h_h, htons);
 	memcpy(response, &h_n, sizeof(header_struct));
 }
@@ -534,6 +533,8 @@ int main() {
 			memcpy(response, &h_n, sizeof(header_struct));
 		}
 
+		print_message("response after adding header section", response, responseSize);
+
 		char questions[512];
 		memcpy(&questions, request + 12, sizeof(request) - 12);
 
@@ -549,6 +550,8 @@ int main() {
 			}
 		}
 
+		print_message("response after adding question section", response, responseSize);
+
 		if (answer_section_enabled) {
 			for (std::vector<char> question_char_vec : questions_list) {
 				std::string question(question_char_vec.begin(), question_char_vec.end());
@@ -557,7 +560,7 @@ int main() {
 			}
 		}
 
-		print_message("response", response, responseSize);
+		print_message("response after adding answer section", response, responseSize);
 
 		// Send response
 		if (sendto(udpSocket, &response, responseSize, 0, reinterpret_cast<struct sockaddr *>(&clientAddress), sizeof(clientAddress)) == -1) {
