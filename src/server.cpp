@@ -1,3 +1,4 @@
+#include <arpa/inet.h>
 #include <cctype>
 #include <cstdint>
 #include <cstring>
@@ -5,11 +6,17 @@
 #include <iostream>
 #include <map>
 #include <netinet/in.h>
+#include <stdio.h>
 #include <string>
+#include <strings.h>
 #include <sys/socket.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include <unordered_map>
 #include <vector>
+
+typedef enum udp_connection_type_enum { client,
+										server } udp_connection_type;
 
 // https://en.cppreference.com/w/cpp/language/bit_field
 struct __attribute__((packed)) header_struct {
@@ -381,7 +388,7 @@ std::vector<std::vector<char>> extract_questions(char *questions, int questions_
 				if (compression_dict.find(offset) != compression_dict.end()) {
 					std::string found_label = compression_dict[offset];
 					printf("found referenced label: %s\n", found_label.c_str());
-					//name_so_far += questions[offset - 12]; // append the label length
+					// name_so_far += questions[offset - 12]; // append the label length
 					name_so_far += found_label;
 					// The pointer takes the form of a two octet sequence
 					// https://www.rfc-editor.org/rfc/rfc1035#section-4.1.4
@@ -437,7 +444,9 @@ void add_answer_section(std::string question, header_struct &h_h, char *response
 	memcpy(response, &h_n, sizeof(header_struct));
 }
 
-int set_up_connection(int &udpSocket, struct sockaddr_in &clientAddress, int PORT) {
+int set_up_connection(const udp_connection_type &udp_connection_type, int &udpSocket, struct sockaddr_in &address, int PORT) {
+	int unused;
+
 	udpSocket = socket(AF_INET, SOCK_DGRAM, 0);
 	if (udpSocket == -1) {
 		std::cerr << "Socket creation failed: " << strerror(errno) << "..." << std::endl;
@@ -451,18 +460,42 @@ int set_up_connection(int &udpSocket, struct sockaddr_in &clientAddress, int POR
 		return 1;
 	}
 
-	sockaddr_in serv_addr = {
-		.sin_family = AF_INET,
-		.sin_port = htons(PORT),
-		.sin_addr = {htonl(INADDR_ANY)},
-	};
-	if (
-		bind(udpSocket, reinterpret_cast<struct sockaddr *>(&serv_addr), sizeof(serv_addr)) != 0) {
-		std::cerr << "Bind failed: " << strerror(errno) << std::endl;
-		return 1;
-	}
+	address.sin_family = AF_INET;
 
-	std::cout << "Bound port: " << ntohs(serv_addr.sin_port) << std::endl;
+	char resolver_dns_ip[] = "1.1.1.1";
+	// https://www.geeksforgeeks.org/udp-client-server-using-connect-c-implementation/
+	switch (udp_connection_type) {
+	case udp_connection_type_enum::client:
+
+		address.sin_addr.s_addr = inet_addr(resolver_dns_ip);
+		// 53 is the standard port for DNS
+		// can be tested with this command:
+		// $ dig 1.1.1.1 -p 53 +noedns google.com
+		address.sin_port = htons(53);
+
+		// connect to server
+		// if (connect(udpSocket, reinterpret_cast<struct sockaddr *>(&address), sizeof(address)) < 0) {
+		//	printf("\n Error : Connect Failed \n");
+		//	return 1;
+		//}
+
+		printf("Connected to resolving DNS server at %s\n", resolver_dns_ip);
+
+		break;
+
+	case udp_connection_type_enum::server:
+		address.sin_addr = {htonl(INADDR_ANY)};
+		address.sin_port = htons(PORT);
+
+		if (
+			bind(udpSocket, reinterpret_cast<struct sockaddr *>(&address), sizeof(address)) != 0) {
+			std::cerr << "Bind failed: " << strerror(errno) << std::endl;
+			return 1;
+		}
+
+		std::cout << "Bound port: " << ntohs(address.sin_port) << std::endl;
+		break;
+	}
 
 	return 0;
 }
@@ -492,10 +525,14 @@ int main(int argc, char *argv[]) {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
 	std::cout << "Logs from your program will appear here!" << std::endl;
 
+	// https://www.geeksforgeeks.org/udp-client-server-using-connect-c-implementation/
+	// [ e.g. dig ] -> [my DNS server] | [my DNS client] -> [resolving server]
+	// [UDP client] -> [  UDP server ] | [  UDP client ] -> [   UDP server   ]
+
 	int clientUdpSocket;
 	struct sockaddr_in clientAddress;
 	socklen_t clientAddrLen = sizeof(clientAddress);
-	if (set_up_connection(clientUdpSocket, clientAddress, 2053)) {
+	if (set_up_connection(udp_connection_type::server, clientUdpSocket, clientAddress, 2053)) {
 		return 1;
 	}
 
@@ -504,7 +541,7 @@ int main(int argc, char *argv[]) {
 	int resolverUdpSocket;
 	struct sockaddr_in resolverAddress;
 	socklen_t resolverAddrLen = sizeof(resolverAddress);
-	if (set_up_connection(resolverUdpSocket, resolverAddress, 2054)) {
+	if (set_up_connection(udp_connection_type::client, resolverUdpSocket, resolverAddress, 2054)) {
 		return 1;
 	}
 
@@ -514,6 +551,12 @@ int main(int argc, char *argv[]) {
 
 	header_struct h_n = {};
 	header_struct h_h = {};
+
+	bool query_resolving_server = true;
+	bool answer_section_enabled = true;
+	bool question_section_enabled = true || answer_section_enabled;
+	bool add_header_section = true || question_section_enabled;
+
 	while (true) {
 		int responseSize = sizeof(header_struct);
 
@@ -534,15 +577,19 @@ int main(int argc, char *argv[]) {
 
 		print_message("request", request, bytesRead);
 
+		if (query_resolving_server) {
+			printf("Forwarding received UDP packet to resolving DNS server\n");
+
+			if (sendto(resolverUdpSocket, &request, sizeof(request), 0, reinterpret_cast<struct sockaddr *>(&resolverAddress), sizeof(resolverAddress)) == -1) {
+				perror("Failed to forward UDP packet to resolver DNS server");
+			}
+		}
+
 		// Copy request to create response
 		memcpy(response, request, bytesRead);
 
 		int questionLength = 0;
 		int answerLength = 0;
-
-		bool answer_section_enabled = true;
-		bool question_section_enabled = true || answer_section_enabled;
-		bool add_header_section = true || question_section_enabled;
 
 		if (add_header_section) {
 			memcpy(&h_n, request, sizeof(header_struct));
