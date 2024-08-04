@@ -5,6 +5,7 @@
 #include <iostream>
 #include <map>
 #include <netinet/in.h>
+#include <string>
 #include <sys/socket.h>
 #include <unistd.h>
 #include <unordered_map>
@@ -299,10 +300,14 @@ std::vector<std::vector<char>> extract_questions(char *questions, int questions_
 				label_length = octet;
 				name_label_or_pointer = label;
 				printf("found label of length %d\n", octet);
+				// ensure the c string in current_label ends with 0x0
+				for (int i = 0; i < 512; i++) {
+					current_label[i] = 0;
+				}
 				memcpy(current_label, &questions[q_byte_idx], 1 + label_length);
 				current_label[1 + label_length] = 0;
 				printf("current label: %s\n", current_label);
-				found_labels.insert({q_byte_idx + 12, current_label});
+				found_labels.insert({q_byte_idx + 12, std::string(current_label)});
 
 				name_so_far += std::string(current_label);
 
@@ -331,9 +336,10 @@ std::vector<std::vector<char>> extract_questions(char *questions, int questions_
 				}
 
 				if (found_labels.find(offset) != found_labels.end()) {
-					printf("found referenced label\n");
-
-					name_so_far += std::string(current_label);
+					std::string found_label = found_labels[offset];
+					printf("found referenced label: %s\n", found_label.c_str());
+					name_so_far += questions[offset - 12]; // append the label length
+					name_so_far += found_label;
 					// The pointer takes the form of a two octet sequence
 					// https://www.rfc-editor.org/rfc/rfc1035#section-4.1.4
 					// c0 10 00 01 00 01 00
