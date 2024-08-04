@@ -439,7 +439,21 @@ void add_answer_section(std::string question, header_struct &h_h, char *response
 	memcpy(response, &h_n, sizeof(header_struct));
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+	for (int i = 0; i < argc; i++) {
+		std::cout << "argv: " << argv[i] << std::endl;
+	}
+
+	std::string resolver_address;
+	if (argc == 3 && strcmp("--resolver", argv[1]) == 0) {
+		resolver_address = argv[2];
+	} else {
+		// Cloudflare DNS server
+		resolver_address = "1.1.1.1";
+	}
+
+	printf("Using server at %s as DNS resolver\n", resolver_address.c_str());
+
 	// Flush after every std::cout / std::cerr
 	std::cout << std::unitbuf;
 	std::cerr << std::unitbuf;
