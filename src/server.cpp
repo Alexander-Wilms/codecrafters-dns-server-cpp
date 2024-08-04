@@ -553,6 +553,8 @@ int main() {
 		std::vector<std::vector<char>> questions_list = extract_questions(questions, sizeof(request) - 12, header_size_increase);
 		responseSize += header_size_increase;
 
+		h_h.setRecursionAvailable(true);
+
 		if (question_section_enabled) {
 			h_h.qdcount = 0;
 			for (std::vector<char> question_char_vec : questions_list) {
