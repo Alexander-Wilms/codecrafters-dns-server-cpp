@@ -252,7 +252,6 @@ void add_question_section(const char *question, header_struct &h_h, char *respon
 }
 
 void print_map(const std::map<int, std::string> &map) {
-	printf("compression dict:\n");
 	for (auto &entry : map) {
 		std::cout << entry.first << ": " << entry.second << ", len " << entry.second.length() << std::endl;
 	}
@@ -277,6 +276,7 @@ std::map<int, std::string> found_labels_to_compression_dict(const std::map<int, 
 				// https://www.geeksforgeeks.org/how-to-convert-a-single-character-to-string-in-cpp/
 
 				compression_dict[entry.first] = entry.second + compression_dict[next_label_idx];
+				print_hex("", (void *)compression_dict[entry.first].c_str(), compression_dict[entry.first].length());
 			} else {
 				printf("no\n");
 				compression_entry_complete = true;
@@ -373,7 +373,7 @@ std::vector<std::vector<char>> extract_questions(char *questions, int questions_
 				printf("found these labels so far:\n");
 				print_map(found_labels);
 
-				printf("resulting in this dict:\n");
+				printf("resulting in this compression dict:\n");
 				print_map(compression_dict);
 
 				if (compression_dict.find(offset) != compression_dict.end()) {
