@@ -583,6 +583,11 @@ int main(int argc, char *argv[]) {
 			std::cout << "Received UDP packet with " << bytesRead << " bytes from resolving DNS server" << std::endl;
 
 			print_message("response from resolving DNS server", responseFromResolvingDNS, bytesReadFromResolvingDNS);
+
+			// Send response
+			if (sendto(clientUdpSocket, &responseFromResolvingDNS, bytesReadFromResolvingDNS, 0, reinterpret_cast<struct sockaddr *>(&clientAddress), sizeof(clientAddress)) == -1) {
+				perror("Failed to send response");
+			}
 		}
 
 		// Copy request to create response
