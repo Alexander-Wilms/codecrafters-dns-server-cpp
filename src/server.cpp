@@ -379,7 +379,7 @@ std::vector<std::vector<char>> extract_questions(char *questions, int questions_
 				if (compression_dict.find(offset) != compression_dict.end()) {
 					std::string found_label = compression_dict[offset];
 					printf("found referenced label: %s\n", found_label.c_str());
-					name_so_far += questions[offset - 12]; // append the label length
+					//name_so_far += questions[offset - 12]; // append the label length
 					name_so_far += found_label;
 					// The pointer takes the form of a two octet sequence
 					// https://www.rfc-editor.org/rfc/rfc1035#section-4.1.4
