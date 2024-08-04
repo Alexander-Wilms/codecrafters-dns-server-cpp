@@ -325,9 +325,8 @@ std:
 
 				uint16_t offset = 0;
 
-				// big endian network byte order
-				offset |= ((uint16_t)second_offset_byte) << 8; // Shift first_offset_byte to the left by 8 bits
-				offset |= (uint16_t)first_offset_byte;		   // Perform a bitwise OR with second_offset_byte
+				offset |= ((uint16_t)first_offset_byte) << 8; // Shift first_offset_byte to the left by 8 bits
+				offset |= (uint16_t)second_offset_byte;		  // Perform a bitwise OR with second_offset_byte
 
 				printf("the pointer has an offset of %d bytes from the start of the entire message\n", offset);
 
