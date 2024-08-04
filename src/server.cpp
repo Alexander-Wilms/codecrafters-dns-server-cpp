@@ -255,7 +255,6 @@ std::vector<std::vector<char>> extract_questions(char *questions, int questions_
 	std::vector<std::vector<char>> questions_list;
 	std::string name_so_far = "";
 	char current_label[512];
-	int name_idx_offset = 0;
 	int label_length = 0;
 	bool done_extracting_names = false;
 	uint8_t octet;
@@ -264,7 +263,6 @@ std::vector<std::vector<char>> extract_questions(char *questions, int questions_
 									  pointer };
 	bool currently_constructing_name_from_labels = true;
 	enum_name_label_or_pointer name_label_or_pointer;
-std:
 	// map is used to access previous labels referenced by pointers used for compression
 	std::map<int, std::string> found_labels;
 
@@ -286,7 +284,6 @@ std:
 			questions_list.push_back(complete_name);
 
 			q_byte_idx += 4;
-			name_idx_offset = q_byte_idx;
 			currently_constructing_name_from_labels = false;
 			name_so_far = "";
 			continue;
@@ -309,7 +306,6 @@ std:
 
 				name_so_far += std::string(current_label);
 
-				name_idx_offset += 1 + label_length;
 				q_byte_idx += label_length;
 
 				printf("extracted name so far: %s\n", name_so_far.c_str());
@@ -336,6 +332,13 @@ std:
 
 				if (found_labels.find(offset) != found_labels.end()) {
 					printf("found referenced label\n");
+
+					name_so_far += std::string(current_label);
+					// The pointer takes the form of a two octet sequence
+					// https://www.rfc-editor.org/rfc/rfc1035#section-4.1.4
+					// c0 10 00 01 00 01 00
+					// p1 p2 x0 type  class
+					q_byte_idx += 6;
 				} else {
 					printf("didn't find referenced label\n");
 				}
